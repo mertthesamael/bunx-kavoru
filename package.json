@@ -1,0 +1,44 @@
+{
+  "name": "kavoru",
+  "version": "0.1.0",
+  "description": "Scaffold a new Kavoru (Elysia + Bun) backend from the official template",
+  "type": "module",
+  "bin": {
+    "kavoru": "bin/kavoru.js"
+  },
+  "files": [
+    "bin",
+    "src"
+  ],
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "test": "bun test"
+  },
+  "keywords": [
+    "elysia",
+    "elysiajs",
+    "bun",
+    "scaffold",
+    "template",
+    "kavoru"
+  ],
+  "author": "https://github.com/mertthesamael",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mertthesamael/kavoru-cli.git"
+  },
+  "homepage": "https://github.com/mertthesamael/Kavoru",
+  "bugs": {
+    "url": "https://github.com/mertthesamael/Kavoru/issues"
+  },
+  "engines": {
+    "bun": ">=1.1.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}
