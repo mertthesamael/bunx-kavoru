@@ -44,7 +44,7 @@ During setup you can pick which integrations to scaffold. Core is always include
 | `cron`      | Cron jobs              |
 | `docker`    | Dockerfile + Compose     |
 
-Interactive mode (TTY) shows a toggle menu after the project name. Non-interactive runs use the full stack unless you pass flags.
+Interactive mode (TTY) shows a checkbox menu (↑↓ move, Space toggle, Enter confirm). Non-interactive runs use the full stack unless you pass flags.
 
 ### Examples
 
