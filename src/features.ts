@@ -108,7 +108,7 @@ const FEATURE_PATHS: Record<FeatureId, string[]> = {
   ],
   resend: ["src/infra/resend"],
   cron: ["src/schedules"],
-  docker: ["Dockerfile", "docker-compose.yaml"],
+  docker: ["Dockerfile", "docker-compose.yaml", "docker/otel.Dockerfile"],
 };
 
 const FEATURE_DEPENDENCIES: Partial<
@@ -523,7 +523,7 @@ function buildAppEnvironment(selection: FeatureSelection): string {
     lines.push("      KAFKA_BROKERS: kafka:9092");
   }
   if (selection.otel) {
-    lines.push("      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces");
+    lines.push("      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel:4318/v1/traces");
     lines.push("      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-kavoru}");
   }
   if (selection.sentry) {
@@ -568,15 +568,14 @@ function generateDockerCompose(selection: FeatureSelection): string {
 `
     : "";
 
-  const jaegerService = selection.otel
+  const otelService = selection.otel
     ? `
-  jaeger:
-    image: jaegertracing/all-in-one:1.62.0
+  otel:
+    build:
+      context: .
+      dockerfile: docker/otel.Dockerfile
     ports:
-      - "16686:16686"
       - "4318:4318"
-    environment:
-      COLLECTOR_OTLP_ENABLED: "true"
     networks:
       - app_network
     restart: unless-stopped
@@ -622,7 +621,7 @@ ${appDependsOn}${appEnvironment}    healthcheck:
       timeout: 300s
       retries: 1
       start_period: 40s
-${kafkaService}${jaegerService}${spotlightService}
+${kafkaService}${otelService}${spotlightService}
 networks:
   app_network:
     driver: bridge
