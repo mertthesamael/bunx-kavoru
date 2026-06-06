@@ -276,10 +276,13 @@ async function patchModulesIndex(
   await writeText(projectDir, relativePath, content);
 }
 
-async function patchEntryIndex(projectDir: string, selection: FeatureSelection) {
+export function buildEntryIndex(selection: FeatureSelection): string {
   const imports = [
     selection.sentry
       ? 'import { initSentry, flushSentry } from "./infra/sentry";'
+      : null,
+    selection.otel
+      ? 'import {\n  bootstrapOpenTelemetry,\n  shutdownOpenTelemetry,\n} from "./infra/telemetry";'
       : null,
     selection.kafka
       ? 'import { startKafka, stopKafka } from "./infra/kafka";'
@@ -291,8 +294,11 @@ async function patchEntryIndex(projectDir: string, selection: FeatureSelection) 
 
   const body: string[] = [];
 
+  if (selection.otel) {
+    body.push("", "bootstrapOpenTelemetry();");
+  }
   if (selection.sentry) {
-    body.push("", "initSentry();");
+    body.push("initSentry();");
   }
 
   body.push("", "const server = new HttpServer();", "");
@@ -326,6 +332,9 @@ async function patchEntryIndex(projectDir: string, selection: FeatureSelection) 
   if (selection.sentry) {
     body.push("    await flushSentry();");
   }
+  if (selection.otel) {
+    body.push("    await shutdownOpenTelemetry();");
+  }
 
   body.push(
     "    process.exit(0);",
@@ -337,7 +346,11 @@ async function patchEntryIndex(projectDir: string, selection: FeatureSelection) 
     "",
   );
 
-  await writeText(projectDir, "src/index.ts", [...imports, ...body].join("\n"));
+  return [...imports, ...body].join("\n");
+}
+
+async function patchEntryIndex(projectDir: string, selection: FeatureSelection) {
+  await writeText(projectDir, "src/index.ts", buildEntryIndex(selection));
 }
 
 async function patchServerIndex(projectDir: string, selection: FeatureSelection) {

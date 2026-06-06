@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   ALL_FEATURES,
   MINIMAL_FEATURES,
+  buildEntryIndex,
   buildEnvExample,
   parseFeatureExcludeList,
   parseFeatureIncludeList,
@@ -37,6 +38,35 @@ describe("parseFeatureExcludeList", () => {
     expect(selection.kafka).toBe(false);
     expect(selection.docker).toBe(false);
     expect(selection.auth).toBe(true);
+  });
+});
+
+describe("buildEntryIndex", () => {
+  it("bootstraps OpenTelemetry before Sentry when both are enabled", () => {
+    const index = buildEntryIndex({
+      ...MINIMAL_FEATURES,
+      otel: true,
+      sentry: true,
+    });
+
+    expect(index).toContain("bootstrapOpenTelemetry");
+    expect(index).toContain("shutdownOpenTelemetry");
+    expect(index.indexOf("bootstrapOpenTelemetry()")).toBeLessThan(
+      index.indexOf("initSentry()"),
+    );
+    expect(index.indexOf("flushSentry()")).toBeLessThan(
+      index.indexOf("shutdownOpenTelemetry()"),
+    );
+  });
+
+  it("omits telemetry bootstrap when otel is disabled", () => {
+    const index = buildEntryIndex({
+      ...MINIMAL_FEATURES,
+      sentry: true,
+    });
+
+    expect(index).not.toContain("bootstrapOpenTelemetry");
+    expect(index).not.toContain("shutdownOpenTelemetry");
   });
 });
 
