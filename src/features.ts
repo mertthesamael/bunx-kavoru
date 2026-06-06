@@ -530,6 +530,28 @@ async function patchDockerfile(projectDir: string, selection: FeatureSelection) 
   await writeText(projectDir, relativePath, content);
 }
 
+const DOCKER_KAFKA_ENV = `# KRaft broker config (Confluent cp-kafka 7.6.1)
+CLUSTER_ID=MkU3OEVBNTcwNTJENDM2Qk
+KAFKA_NODE_ID=0
+KAFKA_PROCESS_ROLES=broker,controller
+KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+KAFKA_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
+KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+KAFKA_LOG_DIRS=/tmp/kraft-combined-logs
+`;
+
+const DOCKER_OTEL_ENV =
+  "# otel-dev runs with CLI flags in Dockerfile; add overrides here if needed.\n";
+
+const DOCKER_SPOTLIGHT_ENV =
+  "# Official Spotlight image; add overrides here if needed.\n";
+
 function buildDockerAppEnv(selection: FeatureSelection): string {
   const lines = [
     "# Docker-only overrides (loaded after root .env)",
@@ -658,6 +680,15 @@ async function patchDockerCompose(
     "docker/app/.env",
     buildDockerAppEnv(selection),
   );
+  if (selection.kafka) {
+    await writeText(projectDir, "docker/kafka/.env", DOCKER_KAFKA_ENV);
+  }
+  if (selection.otel) {
+    await writeText(projectDir, "docker/otel/.env", DOCKER_OTEL_ENV);
+  }
+  if (selection.sentry) {
+    await writeText(projectDir, "docker/spotlight/.env", DOCKER_SPOTLIGHT_ENV);
+  }
   await writeText(projectDir, "docker-compose.yaml", generateDockerCompose(selection));
 }
 
