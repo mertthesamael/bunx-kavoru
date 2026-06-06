@@ -130,21 +130,6 @@ export async function customizeProject(
   pkg.name = packageName;
   await Bun.write(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
 
-  const envExamplePath = path.join(projectDir, ".env.example");
-  const envExample = Bun.file(envExamplePath);
-  if (await envExample.exists()) {
-    let envText = await envExample.text();
-    envText = envText
-      .replace(/^OTEL_SERVICE_NAME=kavoru$/m, `OTEL_SERVICE_NAME=${packageName}`)
-      .replace(/^KAFKA_CLIENT_ID=kavoru$/m, `KAFKA_CLIENT_ID=${packageName}`)
-      .replace(
-        /^KAFKA_GROUP_ID=kavoru-consumer$/m,
-        `KAFKA_GROUP_ID=${packageName}-consumer`,
-      );
-    await Bun.write(envExamplePath, envText);
-    await Bun.write(path.join(projectDir, ".env"), envText);
-  }
-
   const modulesIndex = path.join(projectDir, "src", "modules", "index.ts");
   const modulesFile = Bun.file(modulesIndex);
   if (await modulesFile.exists()) {

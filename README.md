@@ -24,15 +24,45 @@ Equivalent to `bunx --bun kavoru` (Bun runs the `kavoru` binary from the npm pac
 | `--no-install`      | Skip `bun install`                                       |
 | `--repo owner/name` | Override template repo (default: `mertthesamael/Kavoru`) |
 | `--branch name`     | Template branch (default: `master`)                      |
+| `--minimal`         | Core only — health, OpenAPI, response envelope           |
+| `--features list`   | Comma-separated features to include                      |
+| `--no-features list`| Comma-separated features to exclude (default: all on)    |
+
+### Optional features
+
+During setup you can pick which integrations to scaffold. Core is always included: health routes, OpenAPI at `/help`, CORS, and the JSON response envelope.
+
+| ID          | Feature                |
+| ----------- | ---------------------- |
+| `auth`      | JWT authentication     |
+| `prisma`    | Prisma + PostgreSQL    |
+| `otel`      | OpenTelemetry          |
+| `sentry`    | Sentry + Spotlight     |
+| `kafka`     | Kafka producer/consumer|
+| `websocket` | WebSocket realtime     |
+| `resend`    | Resend email           |
+| `cron`      | Cron jobs              |
+| `docker`    | Dockerfile + Compose     |
+
+Interactive mode (TTY) shows a toggle menu after the project name. Non-interactive runs use the full stack unless you pass flags.
 
 ### Examples
 
 ```bash
-# Interactive (prompts for project name)
+# Interactive (prompts for project name + feature toggles)
 bunx kavoru
 
 # Current directory
 bunx kavoru .
+
+# Minimal API skeleton
+bunx kavoru my-api --minimal
+
+# Pick specific features
+bunx kavoru my-api --features auth,prisma,otel,sentry
+
+# Full stack minus Kafka and Docker
+bunx kavoru my-api --no-features kafka,docker
 
 # Custom template fork (local dev)
 bunx kavoru demo --repo your-user/Kavoru --no-install

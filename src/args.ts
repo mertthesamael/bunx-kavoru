@@ -8,6 +8,9 @@ export type CliOptions = {
   force: boolean;
   repo: string;
   branch: string;
+  minimal: boolean;
+  features: string | undefined;
+  noFeatures: string[];
 };
 
 const HELP = `\
@@ -25,10 +28,18 @@ Options:
   --no-install       Skip "bun install" after scaffolding
   --repo <owner/name>  GitHub template repo (default: mertthesamael/Kavoru)
   --branch <name>    Template branch (default: master)
+  --minimal          Core only (health, OpenAPI, response envelope)
+  --features <list>  Comma-separated features to include (default: all)
+  --no-features <list>  Comma-separated features to exclude
+
+Features:
+  auth, prisma, otel, sentry, kafka, websocket, resend, cron, docker
 
 Examples:
   bunx kavoru my-api
-  bunx kavoru .
+  bunx kavoru my-api --minimal
+  bunx kavoru my-api --features auth,prisma,otel
+  bunx kavoru my-api --no-features kafka,docker,resend
 `;
 
 export function parseArgs(argv: string[]): CliOptions {
@@ -40,6 +51,9 @@ export function parseArgs(argv: string[]): CliOptions {
     force: false,
     repo: "mertthesamael/Kavoru",
     branch: "master",
+    minimal: false,
+    features: undefined,
+    noFeatures: [],
   };
 
   const positional: string[] = [];
@@ -64,6 +78,25 @@ export function parseArgs(argv: string[]): CliOptions {
       case "--no-install":
         options.install = false;
         break;
+      case "--minimal":
+        options.minimal = true;
+        break;
+      case "--features": {
+        const value = argv[++i];
+        if (!value) throw new Error("--features requires a comma-separated list.");
+        options.features = value;
+        break;
+      }
+      case "--no-features": {
+        const value = argv[++i];
+        if (!value) {
+          throw new Error("--no-features requires a comma-separated list.");
+        }
+        options.noFeatures.push(
+          ...value.split(",").map((part) => part.trim()).filter(Boolean),
+        );
+        break;
+      }
       case "--repo": {
         const value = argv[++i];
         if (!value) throw new Error("--repo requires a value (owner/name).");
@@ -86,6 +119,10 @@ export function parseArgs(argv: string[]): CliOptions {
 
   if (positional[0]) {
     options.targetDir = positional[0];
+  }
+
+  if (options.minimal && options.features) {
+    throw new Error("Use either --minimal or --features, not both.");
   }
 
   return options;

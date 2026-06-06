@@ -5,7 +5,17 @@ import path from "node:path";
 import * as readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import type { CliOptions } from "./args";
+import {
+  ALL_FEATURES,
+  MINIMAL_FEATURES,
+  applyFeatures,
+  formatFeatureSelection,
+  parseFeatureExcludeList,
+  parseFeatureIncludeList,
+  type FeatureSelection,
+} from "./features";
 import { log } from "./log";
+import { promptFeatureSelection } from "./prompts";
 import {
   customizeProject,
   fetchTemplate,
@@ -49,6 +59,38 @@ async function copyTemplateIntoTarget(
   }
 }
 
+export function resolveFeatureSelection(options: CliOptions): FeatureSelection {
+  if (options.minimal) {
+    return { ...MINIMAL_FEATURES };
+  }
+
+  if (options.features) {
+    return parseFeatureIncludeList(options.features);
+  }
+
+  if (options.noFeatures.length > 0) {
+    return parseFeatureExcludeList(options.noFeatures, ALL_FEATURES);
+  }
+
+  return { ...ALL_FEATURES };
+}
+
+async function resolveFeatureSelectionInteractive(
+  options: CliOptions,
+): Promise<FeatureSelection> {
+  const fromFlags = resolveFeatureSelection(options);
+  const hasExplicitFlags =
+    options.minimal ||
+    options.features !== undefined ||
+    options.noFeatures.length > 0;
+
+  if (hasExplicitFlags || !process.stdin.isTTY || !process.stdout.isTTY) {
+    return fromFlags;
+  }
+
+  return promptFeatureSelection(fromFlags);
+}
+
 export async function runCli(options: CliOptions): Promise<void> {
   let targetArg = options.targetDir;
 
@@ -77,15 +119,18 @@ export async function runCli(options: CliOptions): Promise<void> {
     );
   }
 
+  const featureSelection = await resolveFeatureSelectionInteractive(options);
   const source = resolveTemplateSource(options.repo, options.branch);
   const tempDir = path.join(os.tmpdir(), `kavoru-${Date.now()}`);
 
   log.info(`Creating Kavoru project "${packageName}"`);
+  log.info(`Features: ${formatFeatureSelection(featureSelection)}`);
 
   try {
     await fetchTemplate(source, tempDir);
     await removeGitMetadata(tempDir);
     await customizeProject(tempDir, packageName);
+    await applyFeatures(tempDir, featureSelection, packageName);
     await copyTemplateIntoTarget(tempDir, targetDir);
 
     if (options.install) {
