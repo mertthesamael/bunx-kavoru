@@ -122,10 +122,14 @@ const FEATURE_PATHS: Record<FeatureId, string[]> = {
   docker: ["docker-compose.yaml", "docker"],
   cli: [
     "bin/kavoru.js",
+    "kavoru",
+    "kavoru.cmd",
     "scripts/kavoru-cli.ts",
     "scripts/generate-module.ts",
+    "scripts/link-cli.ts",
     "__tests__/generate-module.test.ts",
     "__tests__/kavoru-cli.test.ts",
+    "__tests__/link-cli.test.ts",
   ],
 };
 
@@ -155,7 +159,7 @@ const FEATURE_SCRIPTS: Partial<Record<FeatureId, string[]>> = {
   otel: ["otel:view", "otel:tui"],
   sentry: ["sentry:spotlight"],
   postgres: ["seed"],
-  cli: ["kavoru", "module"],
+  cli: ["link-cli"],
 };
 
 function resolveFeatureId(raw: string): FeatureId | null {
@@ -494,6 +498,8 @@ async function patchPackageJson(
 
   if (!selection.cli) {
     delete pkg.bin;
+  } else {
+    pkg.bin = { kavoru: "./bin/kavoru.js" };
   }
 
   await Bun.write(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);

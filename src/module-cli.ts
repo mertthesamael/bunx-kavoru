@@ -66,6 +66,7 @@ Usage: kavoru module <module-name> [options]
 
 Generate a feature module under src/modules/<module-name>/ with:
   routes.ts, service.ts, types.ts
+  src/models/schemas/<module-name>.ts (query, body, params schemas)
 
 Options:
   -f, --force   Overwrite an existing module folder
@@ -74,6 +75,5 @@ Options:
 Examples:
   kavoru module users
   kavoru module user-profile --force
-  bun run kavoru module billing
 `);
 }

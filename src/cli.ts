@@ -21,6 +21,7 @@ import {
   customizeProject,
   fetchTemplate,
   installDependencies,
+  linkProjectCli,
   removeGitMetadata,
   resolveTemplateSource,
 } from "./template";
@@ -136,6 +137,9 @@ export async function runCli(options: CliOptions): Promise<void> {
 
     if (options.install) {
       await installDependencies(targetDir);
+      if (featureSelection.cli) {
+        await linkProjectCli(targetDir);
+      }
     }
   } finally {
     await rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
@@ -149,6 +153,12 @@ export async function runCli(options: CliOptions): Promise<void> {
   }
   if (!options.install) {
     console.log("  bun install");
+  }
+  if (featureSelection.cli) {
+    if (!options.install) {
+      console.log("  bun run link-cli       # once: put kavoru on PATH");
+    }
+    console.log("  kavoru module <name>");
   }
   console.log("  bun run dev");
   console.log();

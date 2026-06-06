@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { cp, mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { TEMPLATE_BRANCH } from "./constants";
@@ -147,6 +148,16 @@ export async function customizeProject(
 export async function installDependencies(projectDir: string): Promise<void> {
   log.step("Installing dependencies (bun install)");
   await runCommand(["bun", "install"], projectDir);
+}
+
+export async function linkProjectCli(projectDir: string): Promise<void> {
+  const script = path.join(projectDir, "scripts/link-cli.ts");
+  if (!existsSync(script)) {
+    return;
+  }
+
+  log.step("Linking kavoru to PATH (~/.bun/bin)");
+  await runCommand(["bun", script], projectDir);
 }
 
 export function resolveTemplateSource(
