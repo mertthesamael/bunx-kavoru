@@ -36,10 +36,10 @@ Features:
   auth, prisma, otel, sentry, kafka, websocket, resend, cron, docker
 
 Examples:
-  bunx kavoru my-api
-  bunx kavoru my-api --minimal
-  bunx kavoru my-api --features auth,prisma,otel
-  bunx kavoru my-api --no-features kafka,docker,resend
+  bunx kavoru@latest my-api
+  bunx kavoru@latest my-api --minimal
+  bunx kavoru@latest my-api --features auth,prisma,otel
+  bunx kavoru@latest my-api --no-features kafka,docker,resend
 `;
 
 export function parseArgs(argv: string[]): CliOptions {

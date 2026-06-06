@@ -97,7 +97,7 @@ export async function runCli(options: CliOptions): Promise<void> {
   if (!targetArg) {
     const interactive = process.stdin.isTTY && process.stdout.isTTY;
     if (!interactive) {
-      throw new Error("Missing project directory. Usage: bunx kavoru <directory>");
+      throw new Error("Missing project directory. Usage: bunx kavoru@latest <directory>");
     }
     targetArg = await promptProjectName();
   }

@@ -7,18 +7,23 @@ Scaffold a new [Kavoru](https://github.com/mertthesamael/Kavoru) backend — Ely
 After publishing to npm:
 
 ```bash
-bunx kavoru my-api
+bunx kavoru@latest my-api
 cd my-api
 bun run dev
 ```
 
-Equivalent to `bunx --bun kavoru` (Bun runs the `kavoru` binary from the npm package).
+Always use `@latest` so you get the newest published CLI. Equivalent to `bunx --bun kavoru@latest`.
 
-**Stale UI after upgrade?** Bun caches `bunx` installs under `%TEMP%\bunx-*-kavoru@latest` and does not auto-refresh when a new version is published. Clear it or pin a version:
+**Stale CLI after a new publish?** Bun caches `bunx` installs under `%TEMP%\bunx-*-kavoru@latest` and does not auto-refresh. Clear the cache, then run `@latest` again:
 
 ```powershell
 Remove-Item -Recurse -Force "$env:TEMP\bunx-*-kavoru*"
-bunx kavoru@0.3.0 my-api
+bunx kavoru@latest my-api
+```
+
+```bash
+rm -rf "${TMPDIR:-/tmp}"/bunx-*-kavoru*
+bunx kavoru@latest my-api
 ```
 
 ### Options
@@ -57,22 +62,22 @@ Interactive mode (TTY) shows a checkbox menu (↑↓ move, Space toggle, Enter c
 
 ```bash
 # Interactive (prompts for project name + feature toggles)
-bunx kavoru
+bunx kavoru@latest
 
 # Current directory
-bunx kavoru .
+bunx kavoru@latest .
 
 # Minimal API skeleton
-bunx kavoru my-api --minimal
+bunx kavoru@latest my-api --minimal
 
 # Pick specific features
-bunx kavoru my-api --features auth,prisma,otel,sentry
+bunx kavoru@latest my-api --features auth,prisma,otel,sentry
 
 # Full stack minus Kafka and Docker
-bunx kavoru my-api --no-features kafka,docker
+bunx kavoru@latest my-api --no-features kafka,docker
 
 # Custom template fork (local dev)
-bunx kavoru demo --repo your-user/Kavoru --no-install
+bunx kavoru@latest demo --repo your-user/Kavoru --no-install
 ```
 
 ## Development
@@ -86,7 +91,7 @@ bun test
 bun run src/index.ts my-test-app
 # or
 bun link
-bunx kavoru my-test-app
+bunx kavoru@latest my-test-app
 ```
 
 ## License

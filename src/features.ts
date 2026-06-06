@@ -517,15 +517,25 @@ async function patchDockerfile(projectDir: string, selection: FeatureSelection) 
   await writeText(projectDir, relativePath, content);
 }
 
+function buildAppEnvironment(selection: FeatureSelection): string {
+  const lines = ["      NODE_ENV: production"];
+  if (selection.kafka) {
+    lines.push("      KAFKA_BROKERS: kafka:9092");
+  }
+  if (selection.otel) {
+    lines.push("      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces");
+  }
+  return `    environment:\n${lines.join("\n")}\n`;
+}
+
 function generateDockerCompose(selection: FeatureSelection): string {
   const appDependsOn = selection.kafka
     ? `    depends_on:
       kafka:
         condition: service_started
-    environment:
-      KAFKA_BROKERS: kafka:9092
 `
     : "";
+  const appEnvironment = buildAppEnvironment(selection);
 
   const kafkaService = selection.kafka
     ? `
@@ -590,7 +600,7 @@ function generateDockerCompose(selection: FeatureSelection): string {
     restart: unless-stopped
     env_file:
       - .env
-${appDependsOn}    healthcheck:
+${appDependsOn}${appEnvironment}    healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:\${PORT}/healthz"]
       interval: 600s
       timeout: 300s
@@ -599,10 +609,7 @@ ${appDependsOn}    healthcheck:
 ${kafkaService}${jaegerService}
 networks:
   app_network:
-    name: app_network
     driver: bridge
-
-version: "3.8"
 `;
 }
 
