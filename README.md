@@ -14,6 +14,13 @@ bun run dev
 
 Equivalent to `bunx --bun kavoru` (Bun runs the `kavoru` binary from the npm package).
 
+**Stale UI after upgrade?** Bun caches `bunx` installs under `%TEMP%\bunx-*-kavoru@latest` and does not auto-refresh when a new version is published. Clear it or pin a version:
+
+```powershell
+Remove-Item -Recurse -Force "$env:TEMP\bunx-*-kavoru*"
+bunx kavoru@0.3.0 my-api
+```
+
 ### Options
 
 | Flag                | Description                                              |

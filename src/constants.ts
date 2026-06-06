@@ -1,4 +1,6 @@
-export const PACKAGE_VERSION = "0.1.0";
+import pkg from "../package.json";
+
+export const PACKAGE_VERSION = pkg.version;
 
 export const TEMPLATE_REPO = "mertthesamael/Kavoru";
 export const TEMPLATE_BRANCH = "master";
