@@ -1,6 +1,6 @@
 {
   "name": "kavoru",
-  "version": "0.8.8",
+  "version": "0.8.9",
   "description": "Scaffold a new Kavoru (Elysia + Bun) backend from the official template",
   "type": "module",
   "bin": {

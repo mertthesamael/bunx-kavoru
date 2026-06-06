@@ -15,8 +15,12 @@ export type CliOptions = {
 
 const HELP = `\
 Usage: kavoru [options] [directory]
+       kavoru module <module-name> [options]
 
 Create a new project from the Kavoru Elysia + Bun template.
+
+Commands:
+  module <name>      Generate src/modules/<name> (routes, service, types)
 
 Arguments:
   directory          Project folder (use "." for current directory)
@@ -41,6 +45,7 @@ Examples:
   bunx kavoru@latest my-api --minimal
   bunx kavoru@latest my-api --features auth,postgres,otel
   bunx kavoru@latest my-api --no-features kafka,docker,resend
+  bunx kavoru@latest module users
 `;
 
 export function parseArgs(argv: string[]): CliOptions {

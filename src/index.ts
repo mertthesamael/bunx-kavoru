@@ -3,10 +3,23 @@
 import { parseArgs, printHelp, printVersion } from "./args";
 import { runCli } from "./cli";
 import { log } from "./log";
+import { printModuleHelp, runModuleCommand } from "./module-cli";
 
 async function main(): Promise<void> {
   try {
-    const options = parseArgs(process.argv.slice(2));
+    const argv = process.argv.slice(2);
+
+    if (argv[0] === "module") {
+      if (argv.includes("-h") || argv.includes("--help")) {
+        printModuleHelp();
+        return;
+      }
+
+      await runModuleCommand(argv.slice(1));
+      return;
+    }
+
+    const options = parseArgs(argv);
 
     if (options.help) {
       printHelp();
