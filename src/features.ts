@@ -524,6 +524,10 @@ function buildAppEnvironment(selection: FeatureSelection): string {
   }
   if (selection.otel) {
     lines.push("      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces");
+    lines.push("      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-kavoru}");
+  }
+  if (selection.sentry) {
+    lines.push("      SENTRY_SPOTLIGHT: http://spotlight:8969/stream");
   }
   return `    environment:\n${lines.join("\n")}\n`;
 }
@@ -579,6 +583,18 @@ function generateDockerCompose(selection: FeatureSelection): string {
 `
     : "";
 
+  const spotlightService = selection.sentry
+    ? `
+  spotlight:
+    image: ghcr.io/getsentry/spotlight:latest
+    ports:
+      - "8969:8969"
+    networks:
+      - app_network
+    restart: unless-stopped
+`
+    : "";
+
   return `services:
   app:
     build:
@@ -595,8 +611,8 @@ function generateDockerCompose(selection: FeatureSelection): string {
           - app
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    expose:
-      - "\${PORT}"
+    ports:
+      - "\${PORT:-3131}:\${PORT:-3131}"
     restart: unless-stopped
     env_file:
       - .env
@@ -606,7 +622,7 @@ ${appDependsOn}${appEnvironment}    healthcheck:
       timeout: 300s
       retries: 1
       start_period: 40s
-${kafkaService}${jaegerService}
+${kafkaService}${jaegerService}${spotlightService}
 networks:
   app_network:
     driver: bridge
