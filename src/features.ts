@@ -504,9 +504,14 @@ async function patchDockerfile(projectDir: string, selection: FeatureSelection) 
   let content = current;
   if (!selection.prisma) {
     content = content.replace(/^\s*COPY prisma\.config\.ts \.\/.*\n/m, "");
-    content = content.replace(/^\s*ENV DATABASE_URL=\$\{DATABASE_URL\}\n/m, "");
-    content = content.replace(/^\s*RUN bunx prisma db pull\n/m, "");
-    content = content.replace(/^\s*RUN bunx prisma generate\n/m, "");
+    content = content.replace(
+      /^\s*# generate only needs the schema on disk, not a live database\n/m,
+      "",
+    );
+    content = content.replace(
+      /^\s*RUN if \[ -f src\/infra\/prisma\/schemas\/schema\.prisma \]; then bunx prisma generate; fi\n/m,
+      "",
+    );
   }
 
   await writeText(projectDir, relativePath, content);
@@ -525,19 +530,24 @@ function generateDockerCompose(selection: FeatureSelection): string {
   const kafkaService = selection.kafka
     ? `
   kafka:
-    image: bitnami/kafka:3.9
+    image: confluentinc/cp-kafka:7.6.1
+    hostname: kafka
     ports:
       - "9094:9094"
     environment:
-      KAFKA_CFG_NODE_ID: "0"
-      KAFKA_CFG_PROCESS_ROLES: controller,broker
-      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
-      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
-      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
-      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
-      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      ALLOW_PLAINTEXT_LISTENER: "yes"
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_NODE_ID: "0"
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
     networks:
       - app_network
     restart: unless-stopped
