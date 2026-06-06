@@ -3,6 +3,7 @@ import {
   ALL_FEATURES,
   FEATURES,
   MINIMAL_FEATURES,
+  normalizeFeatureSelection,
   type FeatureId,
   type FeatureSelection,
   formatFeatureSelection,
@@ -154,6 +155,12 @@ export async function promptFeatureSelection(
           const feature = FEATURES[activeIndex];
           if (!feature) break;
           selection[feature.id as FeatureId] = !selection[feature.id as FeatureId];
+          if (feature.id === "postgres" && selection.postgres) {
+            selection.docker = true;
+          }
+          if (feature.id === "docker" && !selection.docker) {
+            selection.postgres = false;
+          }
           lineCount = renderCheckboxMenu(selection, activeIndex, lineCount);
           break;
         }
@@ -166,6 +173,7 @@ export async function promptFeatureSelection(
           lineCount = renderCheckboxMenu(selection, activeIndex, lineCount);
           break;
         case "confirm":
+          Object.assign(selection, normalizeFeatureSelection(selection));
           restoreTerminal(onData);
           stdout.write("\n");
           resolve(selection);

@@ -4,7 +4,7 @@ import { log } from "./log";
 
 export type FeatureId =
   | "auth"
-  | "prisma"
+  | "postgres"
   | "otel"
   | "sentry"
   | "kafka"
@@ -12,6 +12,10 @@ export type FeatureId =
   | "resend"
   | "cron"
   | "docker";
+
+const FEATURE_ALIASES: Record<string, FeatureId> = {
+  prisma: "postgres",
+};
 
 export type FeatureSelection = Record<FeatureId, boolean>;
 
@@ -28,9 +32,9 @@ export const FEATURES: FeatureDef[] = [
     description: "Bearer auth, sign-in route, protected routes",
   },
   {
-    id: "prisma",
-    label: "Prisma + PostgreSQL",
-    description: "Prisma 7 config, migrations, seed scripts",
+    id: "postgres",
+    label: "PostgreSQL",
+    description: "Docker Postgres, Prisma 7, migrations, and seed",
   },
   {
     id: "otel",
@@ -88,7 +92,7 @@ const FEATURE_PATHS: Record<FeatureId, string[]> = {
     "src/constants/jwt.ts",
     "src/models/schemas/signin.ts",
   ],
-  prisma: ["prisma.config.ts", "src/infra/prisma"],
+  postgres: ["prisma.config.ts", "src/infra/prisma"],
   otel: ["src/infra/telemetry"],
   sentry: [
     "src/infra/sentry",
@@ -115,7 +119,7 @@ const FEATURE_DEPENDENCIES: Partial<
   Record<FeatureId, { dependencies?: string[]; devDependencies?: string[] }>
 > = {
   auth: { dependencies: ["@elysiajs/bearer", "@elysiajs/jwt"] },
-  prisma: {
+  postgres: {
     dependencies: ["@prisma/adapter-pg", "@prisma/client"],
     devDependencies: ["prisma"],
   },
@@ -136,8 +140,41 @@ const FEATURE_DEPENDENCIES: Partial<
 const FEATURE_SCRIPTS: Partial<Record<FeatureId, string[]>> = {
   otel: ["otel:view", "otel:tui"],
   sentry: ["sentry:spotlight"],
-  prisma: ["seed"],
+  postgres: ["seed"],
 };
+
+function resolveFeatureId(raw: string): FeatureId | null {
+  const id = FEATURE_ALIASES[raw] ?? raw;
+  return FEATURE_IDS.includes(id as FeatureId) ? (id as FeatureId) : null;
+}
+
+export function toPostgresName(packageName: string): string {
+  const normalized = packageName
+    .replace(/-/g, "_")
+    .replace(/[^a-z0-9_]/gi, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+  return normalized || "app";
+}
+
+export function buildDatabaseUrl(
+  packageName: string,
+  host: string,
+  port = 5432,
+): string {
+  const name = toPostgresName(packageName);
+  return `postgresql://${name}:${name}@${host}:${port}/${name}`;
+}
+
+export function normalizeFeatureSelection(
+  selection: FeatureSelection,
+): FeatureSelection {
+  const next = { ...selection };
+  if (next.postgres) {
+    next.docker = true;
+  }
+  return next;
+}
 
 function enabledFeatures(selection: FeatureSelection): FeatureId[] {
   return FEATURE_IDS.filter((id) => selection[id]);
@@ -159,9 +196,7 @@ export function parseFeatureIncludeList(input: string): FeatureSelection {
     .map((part) => part.trim())
     .filter(Boolean);
 
-  const unknown = requested.filter(
-    (id) => !FEATURE_IDS.includes(id as FeatureId),
-  );
+  const unknown = requested.filter((part) => resolveFeatureId(part) === null);
   if (unknown.length > 0) {
     throw new Error(
       `Unknown feature(s): ${unknown.join(", ")}. Valid: ${FEATURE_IDS.join(", ")}`,
@@ -169,8 +204,12 @@ export function parseFeatureIncludeList(input: string): FeatureSelection {
   }
 
   const selection = { ...MINIMAL_FEATURES };
-  for (const id of requested) {
-    selection[id as FeatureId] = true;
+  for (const part of requested) {
+    const id = resolveFeatureId(part);
+    if (id) selection[id] = true;
+  }
+  if (selection.postgres) {
+    selection.docker = true;
   }
   return selection;
 }
@@ -183,19 +222,24 @@ export function parseFeatureExcludeList(
   const unknown: string[] = [];
 
   for (const raw of excluded) {
-    const id = raw.trim().toLowerCase();
-    if (!id) continue;
-    if (!FEATURE_IDS.includes(id as FeatureId)) {
-      unknown.push(id);
+    const part = raw.trim().toLowerCase();
+    if (!part) continue;
+    const id = resolveFeatureId(part);
+    if (!id) {
+      unknown.push(part);
       continue;
     }
-    selection[id as FeatureId] = false;
+    selection[id] = false;
   }
 
   if (unknown.length > 0) {
     throw new Error(
       `Unknown feature(s): ${unknown.join(", ")}. Valid: ${FEATURE_IDS.join(", ")}`,
     );
+  }
+
+  if (!selection.docker) {
+    selection.postgres = false;
   }
 
   return selection;
@@ -349,11 +393,17 @@ export function buildEntryIndex(selection: FeatureSelection): string {
   return [...imports, ...body].join("\n");
 }
 
-async function patchEntryIndex(projectDir: string, selection: FeatureSelection) {
+async function patchEntryIndex(
+  projectDir: string,
+  selection: FeatureSelection,
+) {
   await writeText(projectDir, "src/index.ts", buildEntryIndex(selection));
 }
 
-async function patchServerIndex(projectDir: string, selection: FeatureSelection) {
+async function patchServerIndex(
+  projectDir: string,
+  selection: FeatureSelection,
+) {
   const relativePath = "src/server/index.ts";
   const current = await readText(projectDir, relativePath);
   if (!current) return;
@@ -422,7 +472,7 @@ async function patchPackageJson(
     }
   }
 
-  if (!selection.prisma && pkg.scripts) {
+  if (!selection.postgres && pkg.scripts) {
     pkg.scripts.start = "bun run src/index.ts";
   }
 
@@ -435,9 +485,11 @@ export function buildEnvExample(
 ): string {
   const lines = ["NODE_ENV=development", "PORT=3131", ""];
 
-  if (selection.prisma) {
+  if (selection.postgres) {
     lines.push(
-      "DATABASE_URL=postgresql://user:password@localhost:5432/your_database",
+      "# Start database: docker compose up -d postgres",
+      "# Host dev uses published port; Docker app overrides host in docker/app/.env",
+      `DATABASE_URL=${buildDatabaseUrl(packageName, "localhost")}`,
       "",
     );
   }
@@ -507,7 +559,10 @@ async function patchEnvExample(
   await writeText(projectDir, ".env", content);
 }
 
-async function patchDockerfile(projectDir: string, selection: FeatureSelection) {
+async function patchDockerfile(
+  projectDir: string,
+  selection: FeatureSelection,
+) {
   if (!selection.docker) return;
 
   const relativePath = "docker/app/Dockerfile";
@@ -515,14 +570,19 @@ async function patchDockerfile(projectDir: string, selection: FeatureSelection) 
   if (!current) return;
 
   let content = current;
-  if (!selection.prisma) {
+  if (!selection.postgres) {
     content = content.replace(/^\s*COPY prisma\.config\.ts \.\/.*\n/m, "");
+    content = content.replace(/^\s*RUN bunx prisma generate\n/m, "");
     content = content.replace(
-      /^\s*# generate only needs the schema on disk, not a live database\n/m,
+      /^COPY docker\/app\/docker-entrypoint\.sh .*$\n/m,
       "",
     );
     content = content.replace(
-      /^\s*RUN if \[ -f src\/infra\/prisma\/schemas\/schema\.prisma \]; then bunx prisma generate; fi\n/m,
+      /^RUN sed -i 's\/\\r\$\/\/' \/app\/docker-entrypoint\.sh && chmod \+x \/app\/docker-entrypoint\.sh\n/m,
+      "",
+    );
+    content = content.replace(
+      /^ENTRYPOINT \["\/bin\/sh", "\/app\/docker-entrypoint\.sh"\]\n/m,
       "",
     );
   }
@@ -552,11 +612,25 @@ const DOCKER_OTEL_ENV =
 const DOCKER_SPOTLIGHT_ENV =
   "# Official Spotlight image; add overrides here if needed.\n";
 
-function buildDockerAppEnv(selection: FeatureSelection): string {
+function buildDockerPostgresEnv(packageName: string): string {
+  const name = toPostgresName(packageName);
+  return `POSTGRES_USER=${name}
+POSTGRES_PASSWORD=${name}
+POSTGRES_DB=${name}
+`;
+}
+
+function buildDockerAppEnv(
+  selection: FeatureSelection,
+  packageName: string,
+): string {
   const lines = [
     "# Docker-only overrides (loaded after root .env)",
     "NODE_ENV=production",
   ];
+  if (selection.postgres) {
+    lines.push(`DATABASE_URL=${buildDatabaseUrl(packageName, "postgres")}`);
+  }
   if (selection.kafka) {
     lines.push("KAFKA_BROKERS=kafka:9092");
   }
@@ -569,11 +643,45 @@ function buildDockerAppEnv(selection: FeatureSelection): string {
   return `${lines.join("\n")}\n`;
 }
 
+function buildAppDependsOn(selection: FeatureSelection): string {
+  const deps: string[] = [];
+  if (selection.postgres) {
+    deps.push(`      postgres:
+        condition: service_healthy`);
+  }
+  if (selection.kafka) {
+    deps.push(`      kafka:
+        condition: service_started`);
+  }
+  if (deps.length === 0) return "";
+  return `    depends_on:
+${deps.join("\n")}
+`;
+}
+
 function generateDockerCompose(selection: FeatureSelection): string {
-  const appDependsOn = selection.kafka
-    ? `    depends_on:
-      kafka:
-        condition: service_started
+  const appDependsOn = buildAppDependsOn(selection);
+
+  const postgresService = selection.postgres
+    ? `
+  postgres:
+    build:
+      context: docker/postgres
+    hostname: postgres
+    ports:
+      - "\${POSTGRES_PORT:-5432}:5432"
+    env_file:
+      - docker/postgres/.env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 `
     : "";
 
@@ -631,7 +739,7 @@ function generateDockerCompose(selection: FeatureSelection): string {
       target: build
       args:
         PORT: \${PORT:-3131}
-    command: /app/server
+    command: ./server
     volumes:
       - ./src:/app/src
     networks:
@@ -644,27 +752,35 @@ function generateDockerCompose(selection: FeatureSelection): string {
       - "\${PORT:-3131}:\${PORT:-3131}"
     restart: unless-stopped
     env_file:
-      - .env
+      - path: .env
+        required: false
       - docker/app/.env
 ${appDependsOn}    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:\${PORT}/healthz"]
+      test: ["CMD", "curl", "-f", "http://localhost:\${PORT:-3131}/healthz"]
       interval: 600s
       timeout: 300s
       retries: 1
-      start_period: 40s
-${kafkaService}${otelService}${spotlightService}
+      start_period: 90s
+${postgresService}${kafkaService}${otelService}${spotlightService}
 networks:
   app_network:
     driver: bridge
-`;
+${selection.postgres ? "\nvolumes:\n  postgres_data:\n" : ""}`;
 }
 
 async function patchDockerCompose(
   projectDir: string,
   selection: FeatureSelection,
+  packageName: string,
 ) {
   if (!selection.docker) return;
 
+  if (!selection.postgres) {
+    await removePaths(projectDir, [
+      "docker/postgres",
+      "docker/app/docker-entrypoint.sh",
+    ]);
+  }
   if (!selection.kafka) {
     await removePaths(projectDir, ["docker/kafka"]);
   }
@@ -678,8 +794,15 @@ async function patchDockerCompose(
   await writeText(
     projectDir,
     "docker/app/.env",
-    buildDockerAppEnv(selection),
+    buildDockerAppEnv(selection, packageName),
   );
+  if (selection.postgres) {
+    await writeText(
+      projectDir,
+      "docker/postgres/.env",
+      buildDockerPostgresEnv(packageName),
+    );
+  }
   if (selection.kafka) {
     await writeText(projectDir, "docker/kafka/.env", DOCKER_KAFKA_ENV);
   }
@@ -689,7 +812,11 @@ async function patchDockerCompose(
   if (selection.sentry) {
     await writeText(projectDir, "docker/spotlight/.env", DOCKER_SPOTLIGHT_ENV);
   }
-  await writeText(projectDir, "docker-compose.yaml", generateDockerCompose(selection));
+  await writeText(
+    projectDir,
+    "docker-compose.yaml",
+    generateDockerCompose(selection),
+  );
 }
 
 export async function applyFeatures(
@@ -710,7 +837,7 @@ export async function applyFeatures(
   await patchPackageJson(projectDir, selection);
   await patchEnvExample(projectDir, selection, packageName);
   await patchDockerfile(projectDir, selection);
-  await patchDockerCompose(projectDir, selection);
+  await patchDockerCompose(projectDir, selection, packageName);
 
   if (disabled.length > 0) {
     log.success("Feature selection applied");

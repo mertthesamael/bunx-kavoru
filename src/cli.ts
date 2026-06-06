@@ -10,6 +10,7 @@ import {
   MINIMAL_FEATURES,
   applyFeatures,
   formatFeatureSelection,
+  normalizeFeatureSelection,
   parseFeatureExcludeList,
   parseFeatureIncludeList,
   type FeatureSelection,
@@ -72,7 +73,7 @@ export function resolveFeatureSelection(options: CliOptions): FeatureSelection {
     return parseFeatureExcludeList(options.noFeatures, ALL_FEATURES);
   }
 
-  return { ...ALL_FEATURES };
+  return normalizeFeatureSelection({ ...ALL_FEATURES });
 }
 
 async function resolveFeatureSelectionInteractive(
@@ -88,7 +89,7 @@ async function resolveFeatureSelectionInteractive(
     return fromFlags;
   }
 
-  return promptFeatureSelection(fromFlags);
+  return normalizeFeatureSelection(await promptFeatureSelection(fromFlags));
 }
 
 export async function runCli(options: CliOptions): Promise<void> {

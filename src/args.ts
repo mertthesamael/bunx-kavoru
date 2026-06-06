@@ -33,12 +33,13 @@ Options:
   --no-features <list>  Comma-separated features to exclude
 
 Features:
-  auth, prisma, otel, sentry, kafka, websocket, resend, cron, docker
+  auth, postgres, otel, sentry, kafka, websocket, resend, cron, docker
+  (prisma is accepted as an alias for postgres)
 
 Examples:
   bunx kavoru@latest my-api
   bunx kavoru@latest my-api --minimal
-  bunx kavoru@latest my-api --features auth,prisma,otel
+  bunx kavoru@latest my-api --features auth,postgres,otel
   bunx kavoru@latest my-api --no-features kafka,docker,resend
 `;
 

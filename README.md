@@ -47,7 +47,7 @@ During setup you can pick which integrations to scaffold. Core is always include
 | ID          | Feature                |
 | ----------- | ---------------------- |
 | `auth`      | JWT authentication     |
-| `prisma`    | Prisma + PostgreSQL    |
+| `postgres`  | PostgreSQL + Prisma (includes Docker Postgres) |
 | `otel`      | OpenTelemetry          |
 | `sentry`    | Sentry + Spotlight     |
 | `kafka`     | Kafka producer/consumer|
@@ -71,7 +71,7 @@ bunx kavoru@latest .
 bunx kavoru@latest my-api --minimal
 
 # Pick specific features
-bunx kavoru@latest my-api --features auth,prisma,otel,sentry
+bunx kavoru@latest my-api --features auth,postgres,otel,sentry
 
 # Full stack minus Kafka and Docker
 bunx kavoru@latest my-api --no-features kafka,docker

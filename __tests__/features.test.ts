@@ -2,8 +2,10 @@ import { describe, expect, it } from "bun:test";
 import {
   ALL_FEATURES,
   MINIMAL_FEATURES,
+  buildDatabaseUrl,
   buildEntryIndex,
   buildEnvExample,
+  normalizeFeatureSelection,
   parseFeatureExcludeList,
   parseFeatureIncludeList,
 } from "../src/features";
@@ -28,6 +30,35 @@ describe("parseFeatureIncludeList", () => {
   it("rejects unknown features", () => {
     expect(() => parseFeatureIncludeList("auth,unknown")).toThrow(
       "Unknown feature(s): unknown",
+    );
+  });
+  it("accepts prisma as an alias for postgres", () => {
+    expect(parseFeatureIncludeList("auth,prisma")).toEqual({
+      ...MINIMAL_FEATURES,
+      auth: true,
+      postgres: true,
+      docker: true,
+    });
+  });
+});
+
+describe("normalizeFeatureSelection", () => {
+  it("enables docker when postgres is selected", () => {
+    expect(
+      normalizeFeatureSelection({
+        ...MINIMAL_FEATURES,
+        postgres: true,
+      }),
+    ).toEqual({
+      ...MINIMAL_FEATURES,
+      postgres: true,
+      docker: true,
+    });
+  });
+
+  it("disables postgres when docker is excluded", () => {
+    expect(parseFeatureExcludeList(["docker"], ALL_FEATURES).postgres).toBe(
+      false,
     );
   });
 });
@@ -82,5 +113,18 @@ describe("buildEnvExample", () => {
     expect(env).toContain("KAFKA_CLIENT_ID=my-api");
     expect(env).not.toContain("DATABASE_URL=");
     expect(env).not.toContain("SENTRY_SPOTLIGHT");
+  });
+
+  it("includes docker postgres DATABASE_URL when postgres is selected", () => {
+    const env = buildEnvExample("my-api", {
+      ...MINIMAL_FEATURES,
+      postgres: true,
+      docker: true,
+    });
+
+    expect(env).toContain("docker compose up -d postgres");
+    expect(env).toContain(
+      `DATABASE_URL=${buildDatabaseUrl("my-api", "localhost")}`,
+    );
   });
 });

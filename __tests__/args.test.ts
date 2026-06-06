@@ -5,8 +5,8 @@ import { MINIMAL_FEATURES } from "../src/features";
 
 describe("parseArgs features", () => {
   it("parses --features", () => {
-    const options = parseArgs(["demo", "--features", "auth,prisma"]);
-    expect(options.features).toBe("auth,prisma");
+    const options = parseArgs(["demo", "--features", "auth,postgres"]);
+    expect(options.features).toBe("auth,postgres");
     expect(options.targetDir).toBe("demo");
   });
 
@@ -30,5 +30,15 @@ describe("resolveFeatureSelection", () => {
   it("returns minimal selection", () => {
     const options = parseArgs(["demo", "--minimal"]);
     expect(resolveFeatureSelection(options)).toEqual(MINIMAL_FEATURES);
+  });
+
+  it("enables docker when postgres is included", () => {
+    const options = parseArgs(["demo", "--features", "auth,postgres"]);
+    expect(resolveFeatureSelection(options)).toEqual({
+      ...MINIMAL_FEATURES,
+      auth: true,
+      postgres: true,
+      docker: true,
+    });
   });
 });
