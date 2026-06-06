@@ -108,7 +108,7 @@ const FEATURE_PATHS: Record<FeatureId, string[]> = {
   ],
   resend: ["src/infra/resend"],
   cron: ["src/schedules"],
-  docker: ["Dockerfile", "docker-compose.yaml", "docker/otel.Dockerfile"],
+  docker: ["docker-compose.yaml", "docker"],
 };
 
 const FEATURE_DEPENDENCIES: Partial<
@@ -510,7 +510,7 @@ async function patchEnvExample(
 async function patchDockerfile(projectDir: string, selection: FeatureSelection) {
   if (!selection.docker) return;
 
-  const relativePath = "Dockerfile";
+  const relativePath = "docker/app/Dockerfile";
   const current = await readText(projectDir, relativePath);
   if (!current) return;
 
@@ -530,19 +530,21 @@ async function patchDockerfile(projectDir: string, selection: FeatureSelection) 
   await writeText(projectDir, relativePath, content);
 }
 
-function buildAppEnvironment(selection: FeatureSelection): string {
-  const lines = ["      NODE_ENV: production"];
+function buildDockerAppEnv(selection: FeatureSelection): string {
+  const lines = [
+    "# Docker-only overrides (loaded after root .env)",
+    "NODE_ENV=production",
+  ];
   if (selection.kafka) {
-    lines.push("      KAFKA_BROKERS: kafka:9092");
+    lines.push("KAFKA_BROKERS=kafka:9092");
   }
   if (selection.otel) {
-    lines.push("      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel:4318/v1/traces");
-    lines.push("      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-kavoru}");
+    lines.push("OTEL_EXPORTER_OTLP_ENDPOINT=http://otel:4318/v1/traces");
   }
   if (selection.sentry) {
-    lines.push("      SENTRY_SPOTLIGHT: http://spotlight:8969/stream");
+    lines.push("SENTRY_SPOTLIGHT=http://spotlight:8969/stream");
   }
-  return `    environment:\n${lines.join("\n")}\n`;
+  return `${lines.join("\n")}\n`;
 }
 
 function generateDockerCompose(selection: FeatureSelection): string {
@@ -552,29 +554,17 @@ function generateDockerCompose(selection: FeatureSelection): string {
         condition: service_started
 `
     : "";
-  const appEnvironment = buildAppEnvironment(selection);
 
   const kafkaService = selection.kafka
     ? `
   kafka:
-    image: confluentinc/cp-kafka:7.6.1
+    build:
+      context: docker/kafka
     hostname: kafka
     ports:
       - "9094:9094"
-    environment:
-      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
-      KAFKA_NODE_ID: "0"
-      KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+    env_file:
+      - docker/kafka/.env
     networks:
       - app_network
     restart: unless-stopped
@@ -585,10 +575,11 @@ function generateDockerCompose(selection: FeatureSelection): string {
     ? `
   otel:
     build:
-      context: .
-      dockerfile: docker/otel.Dockerfile
+      context: docker/otel
     ports:
       - "4318:4318"
+    env_file:
+      - docker/otel/.env
     networks:
       - app_network
     restart: unless-stopped
@@ -598,9 +589,12 @@ function generateDockerCompose(selection: FeatureSelection): string {
   const spotlightService = selection.sentry
     ? `
   spotlight:
-    image: ghcr.io/getsentry/spotlight:latest
+    build:
+      context: docker/spotlight
     ports:
       - "8969:8969"
+    env_file:
+      - docker/spotlight/.env
     networks:
       - app_network
     restart: unless-stopped
@@ -611,6 +605,7 @@ function generateDockerCompose(selection: FeatureSelection): string {
   app:
     build:
       context: .
+      dockerfile: docker/app/Dockerfile
       target: build
       args:
         PORT: \${PORT:-3131}
@@ -628,7 +623,8 @@ function generateDockerCompose(selection: FeatureSelection): string {
     restart: unless-stopped
     env_file:
       - .env
-${appDependsOn}${appEnvironment}    healthcheck:
+      - docker/app/.env
+${appDependsOn}    healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:\${PORT}/healthz"]
       interval: 600s
       timeout: 300s
@@ -646,6 +642,22 @@ async function patchDockerCompose(
   selection: FeatureSelection,
 ) {
   if (!selection.docker) return;
+
+  if (!selection.kafka) {
+    await removePaths(projectDir, ["docker/kafka"]);
+  }
+  if (!selection.otel) {
+    await removePaths(projectDir, ["docker/otel"]);
+  }
+  if (!selection.sentry) {
+    await removePaths(projectDir, ["docker/spotlight"]);
+  }
+
+  await writeText(
+    projectDir,
+    "docker/app/.env",
+    buildDockerAppEnv(selection),
+  );
   await writeText(projectDir, "docker-compose.yaml", generateDockerCompose(selection));
 }
 
