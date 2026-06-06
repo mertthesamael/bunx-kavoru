@@ -24,7 +24,7 @@ function findProjectRoot(cwd: string): string {
   }
 
   throw new Error(
-    "Could not find a Kavoru project. Run this command from your project root.",
+    "Could not find a Kavoru project with the Project CLI enabled. Scaffold with the cli feature or run from a project that includes scripts/kavoru-cli.ts.",
   );
 }
 

@@ -40,6 +40,13 @@ describe("parseFeatureIncludeList", () => {
       docker: true,
     });
   });
+
+  it("accepts kavoru-cli as an alias for cli", () => {
+    expect(parseFeatureIncludeList("cli")).toEqual({
+      ...MINIMAL_FEATURES,
+      cli: true,
+    });
+  });
 });
 
 describe("normalizeFeatureSelection", () => {

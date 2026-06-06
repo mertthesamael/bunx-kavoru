@@ -55,6 +55,7 @@ During setup you can pick which integrations to scaffold. Core is always include
 | `resend`    | Resend email           |
 | `cron`      | Cron jobs              |
 | `docker`    | Dockerfile + Compose     |
+| `cli`       | Project CLI (`kavoru module`, bin, scaffolds) |
 
 Interactive mode (TTY) shows a checkbox menu (↑↓ move, Space toggle, Enter confirm). Non-interactive runs use the full stack unless you pass flags.
 

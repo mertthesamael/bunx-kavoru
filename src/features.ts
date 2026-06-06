@@ -11,10 +11,12 @@ export type FeatureId =
   | "websocket"
   | "resend"
   | "cron"
-  | "docker";
+  | "docker"
+  | "cli";
 
 const FEATURE_ALIASES: Record<string, FeatureId> = {
   prisma: "postgres",
+  "kavoru-cli": "cli",
 };
 
 export type FeatureSelection = Record<FeatureId, boolean>;
@@ -71,6 +73,11 @@ export const FEATURES: FeatureDef[] = [
     label: "Docker",
     description: "Dockerfile and Docker Compose stack",
   },
+  {
+    id: "cli",
+    label: "Project CLI",
+    description: "kavoru module command, bin, and module scaffolds",
+  },
 ];
 
 export const FEATURE_IDS = FEATURES.map((feature) => feature.id);
@@ -113,6 +120,13 @@ const FEATURE_PATHS: Record<FeatureId, string[]> = {
   resend: ["src/infra/resend"],
   cron: ["src/schedules"],
   docker: ["docker-compose.yaml", "docker"],
+  cli: [
+    "bin/kavoru.js",
+    "scripts/kavoru-cli.ts",
+    "scripts/generate-module.ts",
+    "__tests__/generate-module.test.ts",
+    "__tests__/kavoru-cli.test.ts",
+  ],
 };
 
 const FEATURE_DEPENDENCIES: Partial<
@@ -141,6 +155,7 @@ const FEATURE_SCRIPTS: Partial<Record<FeatureId, string[]>> = {
   otel: ["otel:view", "otel:tui"],
   sentry: ["sentry:spotlight"],
   postgres: ["seed"],
+  cli: ["kavoru", "module"],
 };
 
 function resolveFeatureId(raw: string): FeatureId | null {
@@ -446,6 +461,7 @@ async function patchPackageJson(
   if (!(await pkgFile.exists())) return;
 
   const pkg = (await pkgFile.json()) as {
+    bin?: Record<string, string>;
     dependencies?: Record<string, string>;
     devDependencies?: Record<string, string>;
     scripts?: Record<string, string>;
@@ -474,6 +490,10 @@ async function patchPackageJson(
 
   if (!selection.postgres && pkg.scripts) {
     pkg.scripts.start = "bun run src/index.ts";
+  }
+
+  if (!selection.cli) {
+    delete pkg.bin;
   }
 
   await Bun.write(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);

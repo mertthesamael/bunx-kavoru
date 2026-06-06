@@ -37,8 +37,8 @@ Options:
   --no-features <list>  Comma-separated features to exclude
 
 Features:
-  auth, postgres, otel, sentry, kafka, websocket, resend, cron, docker
-  (prisma is accepted as an alias for postgres)
+  auth, postgres, otel, sentry, kafka, websocket, resend, cron, docker, cli
+  (prisma is accepted as an alias for postgres; kavoru-cli for cli)
 
 Examples:
   bunx kavoru@latest my-api
