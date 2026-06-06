@@ -498,8 +498,13 @@ async function patchPackageJson(
 
   if (!selection.cli) {
     delete pkg.bin;
+    if (pkg.scripts?.postinstall === "bun scripts/link-cli.ts") {
+      delete pkg.scripts.postinstall;
+    }
   } else {
     pkg.bin = { kavoru: "./bin/kavoru.js" };
+    pkg.scripts ??= {};
+    pkg.scripts.postinstall = "bun scripts/link-cli.ts";
   }
 
   await Bun.write(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);

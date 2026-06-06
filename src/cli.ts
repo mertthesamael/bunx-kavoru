@@ -155,10 +155,12 @@ export async function runCli(options: CliOptions): Promise<void> {
     console.log("  bun install");
   }
   if (featureSelection.cli) {
+    console.log("  ./kavoru module <name>        # Git Bash / macOS / Linux");
+    console.log("  .\\kavoru.cmd module <name>   # Windows cmd / PowerShell");
     if (!options.install) {
-      console.log("  bun run link-cli       # optional: put kavoru on PATH");
+      console.log("  bun run link-cli              # bare kavoru on PATH (~/.bun/bin)");
     }
-    console.log("  kavoru module <name>   # generate modules");
+    console.log("  bunx kavoru@latest module <name>  # works without PATH setup");
   }
   console.log("  bunx kavoru@latest <dir>  # scaffold another project");
   console.log("  bun run dev");
