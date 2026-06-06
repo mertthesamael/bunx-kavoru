@@ -156,10 +156,11 @@ export async function runCli(options: CliOptions): Promise<void> {
   }
   if (featureSelection.cli) {
     if (!options.install) {
-      console.log("  bun run link-cli       # once: put kavoru on PATH");
+      console.log("  bun run link-cli       # optional: put kavoru on PATH");
     }
-    console.log("  kavoru module <name>");
+    console.log("  kavoru module <name>   # generate modules");
   }
+  console.log("  bunx kavoru@latest <dir>  # scaffold another project");
   console.log("  bun run dev");
   console.log();
   console.log("  API:     http://localhost:3131");
