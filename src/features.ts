@@ -557,7 +557,7 @@ function generateDockerCompose(selection: FeatureSelection): string {
   const jaegerService = selection.otel
     ? `
   jaeger:
-    image: jaegertracing/all-in-one:1.62
+    image: jaegertracing/all-in-one:1.62.0
     ports:
       - "16686:16686"
       - "4318:4318"
