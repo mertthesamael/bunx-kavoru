@@ -51,6 +51,7 @@ During setup you can pick which integrations to scaffold. Core is always include
 | `otel`      | OpenTelemetry          |
 | `sentry`    | Sentry + Spotlight     |
 | `kafka`     | Kafka producer/consumer|
+| `redis`     | Redis cache + CRUD API |
 | `websocket` | WebSocket realtime     |
 | `resend`    | Resend email           |
 | `cron`      | Cron jobs              |

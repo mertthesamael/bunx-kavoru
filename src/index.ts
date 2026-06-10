@@ -3,7 +3,7 @@
 import { parseArgs, printHelp, printVersion } from "./args";
 import { runCli } from "./cli";
 import { log } from "./log";
-import { printModuleHelp, runModuleCommand } from "./module-cli";
+import { printModuleHelp, printRepositoryHelp, runModuleCommand, runRepositoryCommand } from "./module-cli";
 
 async function main(): Promise<void> {
   try {
@@ -16,6 +16,16 @@ async function main(): Promise<void> {
       }
 
       await runModuleCommand(argv.slice(1));
+      return;
+    }
+
+    if (argv[0] === "repository") {
+      if (argv.includes("-h") || argv.includes("--help")) {
+        printRepositoryHelp();
+        return;
+      }
+
+      await runRepositoryCommand(argv.slice(1));
       return;
     }
 

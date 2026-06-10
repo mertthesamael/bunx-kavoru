@@ -106,6 +106,17 @@ describe("buildEntryIndex", () => {
     expect(index).not.toContain("bootstrapOpenTelemetry");
     expect(index).not.toContain("shutdownOpenTelemetry");
   });
+
+  it("wires redis lifecycle when redis is enabled", () => {
+    const index = buildEntryIndex({
+      ...MINIMAL_FEATURES,
+      redis: true,
+    });
+
+    expect(index).toContain("connectRedis");
+    expect(index).toContain("stopRedis");
+    expect(index).not.toContain("startKafka");
+  });
 });
 
 describe("buildEnvExample", () => {
@@ -120,6 +131,18 @@ describe("buildEnvExample", () => {
     expect(env).toContain("KAFKA_CLIENT_ID=my-api");
     expect(env).not.toContain("DATABASE_URL=");
     expect(env).not.toContain("SENTRY_SPOTLIGHT");
+  });
+
+  it("includes redis env block when redis is selected", () => {
+    const env = buildEnvExample("my-api", {
+      ...MINIMAL_FEATURES,
+      redis: true,
+    });
+
+    expect(env).toContain("REDIS_URL=redis://localhost:6379");
+    expect(env).toContain("REDIS_USERNAME=my_api");
+    expect(env).toContain("REDIS_PASSWORD=my_api");
+    expect(env).not.toContain("KAFKA_BROKERS");
   });
 
   it("includes docker postgres DATABASE_URL when postgres is selected", () => {

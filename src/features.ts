@@ -8,6 +8,7 @@ export type FeatureId =
   | "otel"
   | "sentry"
   | "kafka"
+  | "redis"
   | "websocket"
   | "resend"
   | "cron"
@@ -52,6 +53,11 @@ export const FEATURES: FeatureDef[] = [
     id: "kafka",
     label: "Kafka",
     description: "Producer, consumer, and example HTTP endpoints",
+  },
+  {
+    id: "redis",
+    label: "Redis",
+    description: "Cache client and CRUD HTTP endpoints",
   },
   {
     id: "websocket",
@@ -112,6 +118,12 @@ const FEATURE_PATHS: Record<FeatureId, string[]> = {
     "src/models/schemas/kafka.ts",
     "__tests__/kafka.test.ts",
   ],
+  redis: [
+    "src/modules/redis",
+    "src/infra/redis",
+    "src/models/schemas/redis.ts",
+    "__tests__/redis.test.ts",
+  ],
   websocket: [
     "src/modules/realtime",
     "src/models/schemas/realtime.ts",
@@ -126,8 +138,10 @@ const FEATURE_PATHS: Record<FeatureId, string[]> = {
     "kavoru.cmd",
     "scripts/kavoru-cli.ts",
     "scripts/generate-module.ts",
+    "scripts/generate-repository.ts",
     "scripts/link-cli.ts",
     "__tests__/generate-module.test.ts",
+    "__tests__/generate-repository.test.ts",
     "__tests__/kavoru-cli.test.ts",
     "__tests__/link-cli.test.ts",
   ],
@@ -151,6 +165,7 @@ const FEATURE_DEPENDENCIES: Partial<
   },
   sentry: { dependencies: ["@sentry/elysia"] },
   kafka: { dependencies: ["kafkajs"] },
+  redis: { dependencies: ["ioredis"] },
   resend: { dependencies: ["resend"] },
   cron: { dependencies: ["@elysiajs/cron"] },
 };
@@ -183,6 +198,14 @@ export function buildDatabaseUrl(
 ): string {
   const name = toPostgresName(packageName);
   return `postgresql://${name}:${name}@${host}:${port}/${name}`;
+}
+
+export function buildRedisCredentials(packageName: string): {
+  username: string;
+  password: string;
+} {
+  const name = toPostgresName(packageName);
+  return { username: name, password: name };
 }
 
 export function normalizeFeatureSelection(
@@ -340,6 +363,8 @@ async function patchModulesIndex(
 }
 
 export function buildEntryIndex(selection: FeatureSelection): string {
+  const needsAsyncStartup = selection.kafka || selection.redis;
+
   const imports = [
     selection.sentry
       ? 'import { initSentry, flushSentry } from "./infra/sentry";'
@@ -350,9 +375,12 @@ export function buildEntryIndex(selection: FeatureSelection): string {
     selection.kafka
       ? 'import { startKafka, stopKafka } from "./infra/kafka";'
       : null,
+    selection.redis
+      ? 'import { connectRedis, stopRedis } from "./infra/redis";'
+      : null,
     'import { HttpServer } from "./server/index";',
     'import { logger } from "./common/logger";',
-    selection.kafka ? 'import { InternalServerError } from "elysia";' : null,
+    needsAsyncStartup ? 'import { InternalServerError } from "elysia";' : null,
   ].filter(Boolean) as string[];
 
   const body: string[] = [];
@@ -366,14 +394,18 @@ export function buildEntryIndex(selection: FeatureSelection): string {
 
   body.push("", "const server = new HttpServer();", "");
 
-  if (selection.kafka) {
+  if (needsAsyncStartup) {
+    const startupCalls: string[] = [];
+    if (selection.kafka) startupCalls.push("    await startKafka();");
+    if (selection.redis) startupCalls.push("    await connectRedis();");
+
     body.push(
       "void server.start().then(async () => {",
       "  try {",
-      "    await startKafka();",
+      ...startupCalls,
       "  } catch (error) {",
-      '    logger.error("Failed to start Kafka", { error });',
-      '    throw new InternalServerError("Failed to start Kafka");',
+      '    logger.error("Failed to start infrastructure", { error });',
+      '    throw new InternalServerError("Failed to start infrastructure");',
       "  }",
       "});",
     );
@@ -391,6 +423,9 @@ export function buildEntryIndex(selection: FeatureSelection): string {
 
   if (selection.kafka) {
     body.push("    await stopKafka();");
+  }
+  if (selection.redis) {
+    body.push("    await stopRedis();");
   }
   if (selection.sentry) {
     body.push("    await flushSentry();");
@@ -566,6 +601,19 @@ export function buildEnvExample(
     );
   }
 
+  if (selection.redis) {
+    const { username, password } = buildRedisCredentials(packageName);
+    lines.push(
+      "# Redis (enabled by default in development; disabled in test)",
+      "# Start server: docker compose up -d redis",
+      "# REDIS_ENABLED=false",
+      "REDIS_URL=redis://localhost:6379",
+      `REDIS_USERNAME=${username}`,
+      `REDIS_PASSWORD=${password}`,
+      "",
+    );
+  }
+
   if (selection.resend) {
     lines.push(
       "# Resend (disabled when RESEND_API_KEY is unset; always disabled in test)",
@@ -618,7 +666,23 @@ async function patchDockerfile(
     );
   }
 
+  if (!selection.cli) {
+    content = content.replace(/^COPY bin \.\/bin\n/m, "");
+    content = content.replace(
+      /^COPY scripts\/link-cli\.ts \.\/scripts\/link-cli\.ts\n/m,
+      "",
+    );
+    content = content.replace(/^ENV PATH="\/root\/\.bun\/bin:\$\{PATH\}"\n/m, "");
+  }
+
   await writeText(projectDir, relativePath, content);
+}
+
+function buildDockerRedisEnv(packageName: string): string {
+  const { username, password } = buildRedisCredentials(packageName);
+  return `REDIS_USERNAME=${username}
+REDIS_PASSWORD=${password}
+`;
 }
 
 const DOCKER_KAFKA_ENV = `# KRaft broker config (Confluent cp-kafka 7.6.1)
@@ -665,6 +729,12 @@ function buildDockerAppEnv(
   if (selection.kafka) {
     lines.push("KAFKA_BROKERS=kafka:9092");
   }
+  if (selection.redis) {
+    const { username, password } = buildRedisCredentials(packageName);
+    lines.push("REDIS_URL=redis://redis:6379");
+    lines.push(`REDIS_USERNAME=${username}`);
+    lines.push(`REDIS_PASSWORD=${password}`);
+  }
   if (selection.otel) {
     lines.push("OTEL_EXPORTER_OTLP_ENDPOINT=http://otel:4318/v1/traces");
   }
@@ -683,6 +753,10 @@ function buildAppDependsOn(selection: FeatureSelection): string {
   if (selection.kafka) {
     deps.push(`      kafka:
         condition: service_started`);
+  }
+  if (selection.redis) {
+    deps.push(`      redis:
+        condition: service_healthy`);
   }
   if (deps.length === 0) return "";
   return `    depends_on:
@@ -728,6 +802,31 @@ function generateDockerCompose(selection: FeatureSelection): string {
       - docker/kafka/.env
     networks:
       - app_network
+    restart: unless-stopped
+`
+    : "";
+
+  const redisService = selection.redis
+    ? `
+  redis:
+    build:
+      context: docker/redis
+    hostname: redis
+    ports:
+      - "\${REDIS_PORT:-6379}:6379"
+    env_file:
+      - docker/redis/.env
+    networks:
+      - app_network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "redis-cli --user $$REDIS_USERNAME -a $$REDIS_PASSWORD ping | grep -q PONG",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     restart: unless-stopped
 `
     : "";
@@ -792,7 +891,7 @@ ${appDependsOn}    healthcheck:
       timeout: 300s
       retries: 1
       start_period: 90s
-${postgresService}${kafkaService}${otelService}${spotlightService}
+${postgresService}${kafkaService}${redisService}${otelService}${spotlightService}
 networks:
   app_network:
     driver: bridge
@@ -815,6 +914,9 @@ async function patchDockerCompose(
   if (!selection.kafka) {
     await removePaths(projectDir, ["docker/kafka"]);
   }
+  if (!selection.redis) {
+    await removePaths(projectDir, ["docker/redis"]);
+  }
   if (!selection.otel) {
     await removePaths(projectDir, ["docker/otel"]);
   }
@@ -836,6 +938,13 @@ async function patchDockerCompose(
   }
   if (selection.kafka) {
     await writeText(projectDir, "docker/kafka/.env", DOCKER_KAFKA_ENV);
+  }
+  if (selection.redis) {
+    await writeText(
+      projectDir,
+      "docker/redis/.env",
+      buildDockerRedisEnv(packageName),
+    );
   }
   if (selection.otel) {
     await writeText(projectDir, "docker/otel/.env", DOCKER_OTEL_ENV);

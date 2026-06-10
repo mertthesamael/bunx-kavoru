@@ -9,9 +9,15 @@ function findProjectRoot(cwd: string): string {
     const packageJson = path.join(current, "package.json");
     const localCli = path.join(current, "scripts/kavoru-cli.ts");
     const moduleScript = path.join(current, "scripts/generate-module.ts");
+    const repositoryScript = path.join(
+      current,
+      "scripts/generate-repository.ts",
+    );
     if (
       existsSync(packageJson) &&
-      (existsSync(localCli) || existsSync(moduleScript))
+      (existsSync(localCli) ||
+        existsSync(moduleScript) ||
+        existsSync(repositoryScript))
     ) {
       return current;
     }
@@ -28,25 +34,23 @@ function findProjectRoot(cwd: string): string {
   );
 }
 
-export async function runModuleCommand(argv: string[]): Promise<void> {
-  const force = argv.includes("--force") || argv.includes("-f");
-  const name = argv.find((arg) => !arg.startsWith("-"));
-
-  if (!name) {
-    throw new Error("Usage: kavoru module <module-name> [--force]");
-  }
-
-  const projectDir = findProjectRoot(process.cwd());
+async function runProjectScript(
+  projectDir: string,
+  command: "module" | "repository",
+  name: string,
+  force: boolean,
+): Promise<void> {
   const localCli = path.join(projectDir, "scripts/kavoru-cli.ts");
-  const scriptPath = existsSync(localCli)
-    ? localCli
-    : path.join(projectDir, "scripts/generate-module.ts");
+  const fallbackScript =
+    command === "module"
+      ? path.join(projectDir, "scripts/generate-module.ts")
+      : path.join(projectDir, "scripts/generate-repository.ts");
+
+  const scriptPath = existsSync(localCli) ? localCli : fallbackScript;
   const cmd = existsSync(localCli)
-    ? ["bun", scriptPath, "module", name]
+    ? ["bun", scriptPath, command, name]
     : ["bun", scriptPath, name];
   if (force) cmd.push("--force");
-
-  log.info(`Generating module "${name}" in ${projectDir}`);
 
   const proc = Bun.spawn(cmd, {
     cwd: projectDir,
@@ -58,6 +62,39 @@ export async function runModuleCommand(argv: string[]): Promise<void> {
   if (exitCode !== 0) {
     process.exit(exitCode ?? 1);
   }
+}
+
+export async function runModuleCommand(argv: string[]): Promise<void> {
+  const force = argv.includes("--force") || argv.includes("-f");
+  const name = argv.find((arg) => !arg.startsWith("-"));
+
+  if (!name) {
+    throw new Error("Usage: kavoru module <module-name> [--force]");
+  }
+
+  const projectDir = findProjectRoot(process.cwd());
+  log.info(`Generating module "${name}" in ${projectDir}`);
+  await runProjectScript(projectDir, "module", name, force);
+}
+
+export async function runRepositoryCommand(argv: string[]): Promise<void> {
+  const force = argv.includes("--force") || argv.includes("-f");
+  const name = argv.find((arg) => !arg.startsWith("-"));
+
+  if (!name) {
+    throw new Error("Usage: kavoru repository <repository-name> [--force]");
+  }
+
+  const projectDir = findProjectRoot(process.cwd());
+  const prismaConfig = path.join(projectDir, "prisma.config.ts");
+  if (!existsSync(prismaConfig)) {
+    throw new Error(
+      "PostgreSQL/Prisma is not enabled in this project. Scaffold with the postgres feature first.",
+    );
+  }
+
+  log.info(`Generating repository "${name}" in ${projectDir}`);
+  await runProjectScript(projectDir, "repository", name, force);
 }
 
 export function printModuleHelp(): void {
@@ -75,5 +112,25 @@ Options:
 Examples:
   kavoru module users
   kavoru module user-profile --force
+`);
+}
+
+export function printRepositoryHelp(): void {
+  console.log(`\
+Usage: kavoru repository <repository-name> [options]
+
+Generate Prisma model + repository (requires postgres/prisma feature):
+  src/infra/prisma/schemas/<name>.prisma
+  src/infra/prisma/repositories/<name>.ts
+
+Runs bunx prisma generate when finished.
+
+Options:
+  -f, --force   Overwrite existing schema/repository files
+  -h, --help    Show help
+
+Examples:
+  kavoru repository user
+  kavoru repository billing --force
 `);
 }
