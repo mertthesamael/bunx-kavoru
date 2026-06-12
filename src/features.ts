@@ -12,8 +12,10 @@ export type FeatureId =
   | "websocket"
   | "resend"
   | "cron"
-  | "docker"
   | "cli";
+
+/** Always scaffolded — not a CLI toggle. */
+export const ALWAYS_INCLUDED = ["docker"] as const;
 
 const FEATURE_ALIASES: Record<string, FeatureId> = {
   prisma: "postgres",
@@ -75,11 +77,6 @@ export const FEATURES: FeatureDef[] = [
     description: "Scheduled tasks via @elysiajs/cron",
   },
   {
-    id: "docker",
-    label: "Docker",
-    description: "Dockerfile and Docker Compose stack",
-  },
-  {
     id: "cli",
     label: "Project CLI",
     description: "kavoru module command, bin, and module scaffolds",
@@ -131,7 +128,6 @@ const FEATURE_PATHS: Record<FeatureId, string[]> = {
   ],
   resend: ["src/infra/resend"],
   cron: ["src/schedules"],
-  docker: ["docker-compose.yaml", "docker"],
   cli: [
     "bin/kavoru.js",
     "kavoru",
@@ -211,11 +207,19 @@ export function buildRedisCredentials(packageName: string): {
 export function normalizeFeatureSelection(
   selection: FeatureSelection,
 ): FeatureSelection {
-  const next = { ...selection };
-  if (next.postgres) {
-    next.docker = true;
-  }
-  return next;
+  return { ...selection };
+}
+
+function rejectReservedFeatureToggle(parts: string[], action: "include" | "exclude") {
+  const reserved = parts.filter((part) =>
+    ALWAYS_INCLUDED.includes(part as (typeof ALWAYS_INCLUDED)[number]),
+  );
+  if (reserved.length === 0) return;
+
+  const verb = action === "exclude" ? "disable" : "toggle";
+  throw new Error(
+    `Docker is always included and cannot be ${verb}. Omit "docker" from --features / --no-features.`,
+  );
 }
 
 function enabledFeatures(selection: FeatureSelection): FeatureId[] {
@@ -238,6 +242,8 @@ export function parseFeatureIncludeList(input: string): FeatureSelection {
     .map((part) => part.trim())
     .filter(Boolean);
 
+  rejectReservedFeatureToggle(requested, "include");
+
   const unknown = requested.filter((part) => resolveFeatureId(part) === null);
   if (unknown.length > 0) {
     throw new Error(
@@ -250,9 +256,6 @@ export function parseFeatureIncludeList(input: string): FeatureSelection {
     const id = resolveFeatureId(part);
     if (id) selection[id] = true;
   }
-  if (selection.postgres) {
-    selection.docker = true;
-  }
   return selection;
 }
 
@@ -262,6 +265,11 @@ export function parseFeatureExcludeList(
 ): FeatureSelection {
   const selection = { ...base };
   const unknown: string[] = [];
+
+  rejectReservedFeatureToggle(
+    excluded.map((part) => part.trim().toLowerCase()).filter(Boolean),
+    "exclude",
+  );
 
   for (const raw of excluded) {
     const part = raw.trim().toLowerCase();
@@ -278,10 +286,6 @@ export function parseFeatureExcludeList(
     throw new Error(
       `Unknown feature(s): ${unknown.join(", ")}. Valid: ${FEATURE_IDS.join(", ")}`,
     );
-  }
-
-  if (!selection.docker) {
-    selection.postgres = false;
   }
 
   return selection;
@@ -642,8 +646,6 @@ async function patchDockerfile(
   projectDir: string,
   selection: FeatureSelection,
 ) {
-  if (!selection.docker) return;
-
   const relativePath = "docker/app/Dockerfile";
   const current = await readText(projectDir, relativePath);
   if (!current) return;
@@ -903,8 +905,6 @@ async function patchDockerCompose(
   selection: FeatureSelection,
   packageName: string,
 ) {
-  if (!selection.docker) return;
-
   if (!selection.postgres) {
     await removePaths(projectDir, [
       "docker/postgres",

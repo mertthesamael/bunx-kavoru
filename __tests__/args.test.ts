@@ -11,12 +11,8 @@ describe("parseArgs features", () => {
   });
 
   it("parses --no-features", () => {
-    const options = parseArgs([
-      "demo",
-      "--no-features",
-      "kafka,docker",
-    ]);
-    expect(options.noFeatures).toEqual(["kafka", "docker"]);
+    const options = parseArgs(["demo", "--no-features", "kafka,redis"]);
+    expect(options.noFeatures).toEqual(["kafka", "redis"]);
   });
 
   it("rejects --minimal with --features", () => {
@@ -32,13 +28,12 @@ describe("resolveFeatureSelection", () => {
     expect(resolveFeatureSelection(options)).toEqual(MINIMAL_FEATURES);
   });
 
-  it("enables docker when postgres is included", () => {
+  it("enables postgres when included", () => {
     const options = parseArgs(["demo", "--features", "auth,postgres"]);
     expect(resolveFeatureSelection(options)).toEqual({
       ...MINIMAL_FEATURES,
       auth: true,
       postgres: true,
-      docker: true,
     });
   });
 });

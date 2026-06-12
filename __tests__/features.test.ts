@@ -32,12 +32,18 @@ describe("parseFeatureIncludeList", () => {
       "Unknown feature(s): unknown",
     );
   });
+
+  it("rejects docker in include list", () => {
+    expect(() => parseFeatureIncludeList("auth,docker")).toThrow(
+      "Docker is always included",
+    );
+  });
+
   it("accepts prisma as an alias for postgres", () => {
     expect(parseFeatureIncludeList("auth,prisma")).toEqual({
       ...MINIMAL_FEATURES,
       auth: true,
       postgres: true,
-      docker: true,
     });
   });
 
@@ -50,7 +56,7 @@ describe("parseFeatureIncludeList", () => {
 });
 
 describe("normalizeFeatureSelection", () => {
-  it("enables docker when postgres is selected", () => {
+  it("returns selection unchanged", () => {
     expect(
       normalizeFeatureSelection({
         ...MINIMAL_FEATURES,
@@ -59,23 +65,22 @@ describe("normalizeFeatureSelection", () => {
     ).toEqual({
       ...MINIMAL_FEATURES,
       postgres: true,
-      docker: true,
     });
-  });
-
-  it("disables postgres when docker is excluded", () => {
-    expect(parseFeatureExcludeList(["docker"], ALL_FEATURES).postgres).toBe(
-      false,
-    );
   });
 });
 
 describe("parseFeatureExcludeList", () => {
   it("disables listed features", () => {
-    const selection = parseFeatureExcludeList(["kafka", "docker"], ALL_FEATURES);
+    const selection = parseFeatureExcludeList(["kafka", "redis"], ALL_FEATURES);
     expect(selection.kafka).toBe(false);
-    expect(selection.docker).toBe(false);
+    expect(selection.redis).toBe(false);
     expect(selection.auth).toBe(true);
+  });
+
+  it("rejects docker in exclude list", () => {
+    expect(() => parseFeatureExcludeList(["docker"], ALL_FEATURES)).toThrow(
+      "Docker is always included",
+    );
   });
 });
 
@@ -149,7 +154,6 @@ describe("buildEnvExample", () => {
     const env = buildEnvExample("my-api", {
       ...MINIMAL_FEATURES,
       postgres: true,
-      docker: true,
     });
 
     expect(env).toContain("docker compose up -d postgres");

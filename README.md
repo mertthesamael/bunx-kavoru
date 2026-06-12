@@ -1,6 +1,6 @@
 # kavoru (CLI)
 
-Scaffold a new [Kavoru](https://github.com/mertthesamael/Kavoru) backend — ElysiaJS, Bun, TypeScript, Prisma, and the full production starter stack.
+Scaffold a new [Kavoru](https://kavoru.com) backend — ElysiaJS, Bun, TypeScript, Prisma, and the full production starter stack.
 
 ## Usage
 
@@ -9,10 +9,12 @@ After publishing to npm:
 ```bash
 bunx kavoru@latest my-api
 cd my-api
-bun run dev
+docker compose up --build
 ```
 
 Always use `@latest` so you get the newest published CLI. Equivalent to `bunx --bun kavoru@latest`.
+
+Every scaffold includes **Docker Compose** (`docker-compose.yaml` + `docker/app/`). Infra services (Postgres, Kafka, Redis, OTEL, Spotlight) are added when you select those features — the app service is always present.
 
 **Stale CLI after a new publish?** Bun caches `bunx` installs under `%TEMP%\bunx-*-kavoru@latest` and does not auto-refresh. Clear the cache, then run `@latest` again:
 
@@ -42,7 +44,7 @@ bunx kavoru@latest my-api
 
 ### Optional features
 
-During setup you can pick which integrations to scaffold. Core is always included: health routes, OpenAPI at `/help`, CORS, and the JSON response envelope.
+During setup you can pick which integrations to scaffold. **Docker Compose is always included** (app image + compose file). Core is always included: health routes, OpenAPI at `/help`, CORS, and the JSON response envelope.
 
 | ID          | Feature                |
 | ----------- | ---------------------- |
@@ -55,7 +57,6 @@ During setup you can pick which integrations to scaffold. Core is always include
 | `websocket` | WebSocket realtime     |
 | `resend`    | Resend email           |
 | `cron`      | Cron jobs              |
-| `docker`    | Dockerfile + Compose     |
 | `cli`       | Project CLI (`kavoru module`, bin, root shims) |
 
 Interactive mode (TTY) shows a checkbox menu (↑↓ move, Space toggle, Enter confirm). Non-interactive runs use the full stack unless you pass flags.
@@ -75,8 +76,8 @@ bunx kavoru@latest my-api --minimal
 # Pick specific features
 bunx kavoru@latest my-api --features auth,postgres,otel,sentry
 
-# Full stack minus Kafka and Docker
-bunx kavoru@latest my-api --no-features kafka,docker
+# Full stack minus Kafka and Resend
+bunx kavoru@latest my-api --no-features kafka,resend
 
 # Custom template fork (local dev)
 bunx kavoru@latest demo --repo your-user/Kavoru --no-install
