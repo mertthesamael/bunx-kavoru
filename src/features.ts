@@ -9,6 +9,7 @@ export type FeatureId =
   | "sentry"
   | "kafka"
   | "redis"
+  | "llama"
   | "websocket"
   | "resend"
   | "cron"
@@ -60,6 +61,11 @@ export const FEATURES: FeatureDef[] = [
     id: "redis",
     label: "Redis",
     description: "Cache client and CRUD HTTP endpoints",
+  },
+  {
+    id: "llama",
+    label: "Llama (Ollama)",
+    description: "Local LLM via Ollama Docker service and chat endpoint",
   },
   {
     id: "websocket",
@@ -120,6 +126,12 @@ const FEATURE_PATHS: Record<FeatureId, string[]> = {
     "src/infra/redis",
     "src/models/schemas/redis.ts",
     "__tests__/redis.test.ts",
+  ],
+  llama: [
+    "src/modules/llama",
+    "src/infra/llama",
+    "src/models/schemas/llama.ts",
+    "__tests__/llama.test.ts",
   ],
   websocket: [
     "src/modules/realtime",
@@ -618,6 +630,18 @@ export function buildEnvExample(
     );
   }
 
+  if (selection.llama) {
+    lines.push(
+      "# Llama via Ollama (enabled by default in development; disabled in test)",
+      "# Start server: docker compose up -d llama",
+      "# Model is pulled automatically on first llama container start",
+      "# LLAMA_ENABLED=false",
+      "LLAMA_URL=http://localhost:11434",
+      "LLAMA_MODEL=llama3.2",
+      "",
+    );
+  }
+
   if (selection.resend) {
     lines.push(
       "# Resend (disabled when RESEND_API_KEY is unset; always disabled in test)",
@@ -709,6 +733,12 @@ const DOCKER_OTEL_ENV =
 const DOCKER_SPOTLIGHT_ENV =
   "# Official Spotlight image; add overrides here if needed.\n";
 
+const DOCKER_LLAMA_ENV = `# Ollama serves Llama models on port 11434
+# Pulled automatically on first container start (see docker-entrypoint.sh)
+OLLAMA_HOST=0.0.0.0
+OLLAMA_MODEL=llama3.2
+`;
+
 function buildDockerPostgresEnv(packageName: string): string {
   const name = toPostgresName(packageName);
   return `POSTGRES_USER=${name}
@@ -743,6 +773,10 @@ function buildDockerAppEnv(
   if (selection.sentry) {
     lines.push("SENTRY_SPOTLIGHT=http://spotlight:8969/stream");
   }
+  if (selection.llama) {
+    lines.push("LLAMA_URL=http://llama:11434");
+    lines.push("LLAMA_MODEL=llama3.2");
+  }
   return `${lines.join("\n")}\n`;
 }
 
@@ -759,6 +793,10 @@ function buildAppDependsOn(selection: FeatureSelection): string {
   if (selection.redis) {
     deps.push(`      redis:
         condition: service_healthy`);
+  }
+  if (selection.llama) {
+    deps.push(`      llama:
+        condition: service_started`);
   }
   if (deps.length === 0) return "";
   return `    depends_on:
@@ -863,6 +901,24 @@ function generateDockerCompose(selection: FeatureSelection): string {
 `
     : "";
 
+  const llamaService = selection.llama
+    ? `
+  llama:
+    build:
+      context: docker/llama
+    hostname: llama
+    ports:
+      - "\${LLAMA_PORT:-11434}:11434"
+    env_file:
+      - docker/llama/.env
+    volumes:
+      - llama_data:/root/.ollama
+    networks:
+      - app_network
+    restart: unless-stopped
+`
+    : "";
+
   return `services:
   app:
     build:
@@ -893,11 +949,19 @@ ${appDependsOn}    healthcheck:
       timeout: 300s
       retries: 1
       start_period: 90s
-${postgresService}${kafkaService}${redisService}${otelService}${spotlightService}
+${postgresService}${kafkaService}${redisService}${otelService}${spotlightService}${llamaService}
 networks:
   app_network:
     driver: bridge
-${selection.postgres ? "\nvolumes:\n  postgres_data:\n" : ""}`;
+${buildComposeVolumes(selection)}`;
+}
+
+function buildComposeVolumes(selection: FeatureSelection): string {
+  const volumes: string[] = [];
+  if (selection.postgres) volumes.push("  postgres_data:");
+  if (selection.llama) volumes.push("  llama_data:");
+  if (volumes.length === 0) return "";
+  return `\nvolumes:\n${volumes.join("\n")}\n`;
 }
 
 async function patchDockerCompose(
@@ -922,6 +986,9 @@ async function patchDockerCompose(
   }
   if (!selection.sentry) {
     await removePaths(projectDir, ["docker/spotlight"]);
+  }
+  if (!selection.llama) {
+    await removePaths(projectDir, ["docker/llama"]);
   }
 
   await writeText(
@@ -951,6 +1018,9 @@ async function patchDockerCompose(
   }
   if (selection.sentry) {
     await writeText(projectDir, "docker/spotlight/.env", DOCKER_SPOTLIGHT_ENV);
+  }
+  if (selection.llama) {
+    await writeText(projectDir, "docker/llama/.env", DOCKER_LLAMA_ENV);
   }
   await writeText(
     projectDir,

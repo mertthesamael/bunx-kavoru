@@ -150,6 +150,18 @@ describe("buildEnvExample", () => {
     expect(env).not.toContain("KAFKA_BROKERS");
   });
 
+  it("includes llama env block when llama is selected", () => {
+    const env = buildEnvExample("my-api", {
+      ...MINIMAL_FEATURES,
+      llama: true,
+    });
+
+    expect(env).toContain("LLAMA_URL=http://localhost:11434");
+    expect(env).toContain("LLAMA_MODEL=llama3.2");
+    expect(env).toContain("docker compose up -d llama");
+    expect(env).not.toContain("KAFKA_BROKERS");
+  });
+
   it("includes docker postgres DATABASE_URL when postgres is selected", () => {
     const env = buildEnvExample("my-api", {
       ...MINIMAL_FEATURES,
