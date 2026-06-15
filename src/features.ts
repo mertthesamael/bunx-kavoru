@@ -774,6 +774,7 @@ function buildDockerAppEnv(
     lines.push("SENTRY_SPOTLIGHT=http://spotlight:8969/stream");
   }
   if (selection.llama) {
+    lines.push("LLAMA_ENABLED=true");
     lines.push("LLAMA_URL=http://llama:11434");
     lines.push("LLAMA_MODEL=llama3.2");
   }
