@@ -32,7 +32,7 @@ Options:
   --no-install       Skip "bun install" after scaffolding
   --repo <owner/name>  GitHub template repo (default: mertthesamael/Kavoru)
   --branch <name>    Template branch (default: master)
-  --minimal          Core only (health, OpenAPI, response envelope)
+  --minimal          Core optional integrations only (Docker + Project CLI always included)
   --features <list>  Comma-separated features to include (default: all)
   --no-features <list>  Comma-separated features to exclude
 

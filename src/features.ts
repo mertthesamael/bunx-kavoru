@@ -17,6 +17,19 @@ export type FeatureId =
 /** Always scaffolded — not a CLI toggle. */
 export const ALWAYS_INCLUDED = ["docker", "cli"] as const;
 
+export const MANDATORY_FEATURE_DEFS = [
+  {
+    id: "docker",
+    label: "Docker Compose",
+    description: "docker-compose.yaml + app image",
+  },
+  {
+    id: "cli",
+    label: "Project CLI",
+    description: "kavoru module command, bin, shims",
+  },
+] as const;
+
 const FEATURE_ALIASES: Record<string, FeatureId> = {
   prisma: "postgres",
 };
@@ -288,9 +301,12 @@ export function parseFeatureExcludeList(
 }
 
 export function formatFeatureSelection(selection: FeatureSelection): string {
+  const mandatory = ALWAYS_INCLUDED.join(", ");
   const enabled = enabledFeatures(selection);
-  if (enabled.length === 0) return "core only";
-  return enabled.join(", ");
+  if (enabled.length === 0) {
+    return `${mandatory} · optional: none`;
+  }
+  return `${mandatory} · optional: ${enabled.join(", ")}`;
 }
 
 async function removePaths(projectDir: string, relativePaths: string[]) {

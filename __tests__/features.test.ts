@@ -8,6 +8,7 @@ import {
   buildDatabaseUrl,
   buildEntryIndex,
   buildEnvExample,
+  formatFeatureSelection,
   normalizeFeatureSelection,
   parseFeatureExcludeList,
   parseFeatureIncludeList,
@@ -181,6 +182,15 @@ describe("buildEnvExample", () => {
     expect(env).toContain(
       `DATABASE_URL=${buildDatabaseUrl("my-api", "localhost")}`,
     );
+  });
+});
+
+describe("formatFeatureSelection", () => {
+  it("always lists docker and cli as mandatory", () => {
+    expect(formatFeatureSelection(MINIMAL_FEATURES)).toBe(
+      "docker, cli · optional: none",
+    );
+    expect(formatFeatureSelection(ALL_FEATURES)).toContain("docker, cli · optional:");
   });
 });
 

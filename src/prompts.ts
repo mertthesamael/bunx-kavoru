@@ -2,6 +2,7 @@ import { stdin, stdout } from "node:process";
 import {
   ALL_FEATURES,
   FEATURES,
+  MANDATORY_FEATURE_DEFS,
   MINIMAL_FEATURES,
   normalizeFeatureSelection,
   type FeatureId,
@@ -84,9 +85,18 @@ function renderCheckboxMenu(
 ): number {
   const lines: string[] = [
     `${cyan}◆${reset} Select optional features ${dim}(↑↓ move · Space toggle · Enter confirm)${reset}`,
-    `${dim}  a = all · m = minimal${reset}`,
+    `${dim}  a = all · m = minimal optional only${reset}`,
     "",
+    `${dim}Always included:${reset}`,
   ];
+
+  for (const feature of MANDATORY_FEATURE_DEFS) {
+    lines.push(
+      `   [x] ${feature.label.padEnd(22)} ${dim}${feature.description}${reset}`,
+    );
+  }
+
+  lines.push("", `${dim}Optional:${reset}`);
 
   FEATURES.forEach((feature, index) => {
     const isActive = index === activeIndex;

@@ -38,7 +38,7 @@ bunx kavoru@latest my-api
 | `--no-install`      | Skip `bun install`                                       |
 | `--repo owner/name` | Override template repo (default: `mertthesamael/Kavoru`) |
 | `--branch name`     | Template branch (default: `master`)                      |
-| `--minimal`         | Core only — health, OpenAPI, response envelope           |
+| `--minimal`         | Optional integrations off (Docker Compose + Project CLI always included) |
 | `--features list`   | Comma-separated features to include                      |
 | `--no-features list`| Comma-separated features to exclude (default: all on)    |
 
