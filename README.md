@@ -14,7 +14,7 @@ docker compose up --build
 
 Always use `@latest` so you get the newest published CLI. Equivalent to `bunx --bun kavoru@latest`.
 
-Every scaffold includes **Docker Compose** (`docker-compose.yaml` + `docker/app/`). Infra services (Postgres, Kafka, Redis, OTEL, Spotlight) are added when you select those features — the app service is always present.
+Every scaffold includes **Docker Compose** (`docker-compose.yaml` + `docker/app/`) and the **Project CLI** (`kavoru module`, bin, root shims). Infra services (Postgres, Kafka, Redis, Llama, OTEL, Spotlight) are added when you select those features — the app service is always present.
 
 **Stale CLI after a new publish?** Bun caches `bunx` installs under `%TEMP%\bunx-*-kavoru@latest` and does not auto-refresh. Clear the cache, then run `@latest` again:
 
@@ -44,7 +44,7 @@ bunx kavoru@latest my-api
 
 ### Optional features
 
-During setup you can pick which integrations to scaffold. **Docker Compose is always included** (app image + compose file). Core is always included: health routes, OpenAPI at `/help`, CORS, and the JSON response envelope.
+During setup you can pick which integrations to scaffold. **Docker Compose** and **Project CLI** are always included. Core is always included: health routes, OpenAPI at `/help`, CORS, and the JSON response envelope.
 
 | ID          | Feature                |
 | ----------- | ---------------------- |
@@ -57,7 +57,6 @@ During setup you can pick which integrations to scaffold. **Docker Compose is al
 | `websocket` | WebSocket realtime     |
 | `resend`    | Resend email           |
 | `cron`      | Cron jobs              |
-| `cli`       | Project CLI (`kavoru module`, bin, root shims) |
 
 Interactive mode (TTY) shows a checkbox menu (↑↓ move, Space toggle, Enter confirm). Non-interactive runs use the full stack unless you pass flags.
 

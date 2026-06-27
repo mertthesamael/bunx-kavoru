@@ -35,7 +35,13 @@ describe("parseFeatureIncludeList", () => {
 
   it("rejects docker in include list", () => {
     expect(() => parseFeatureIncludeList("auth,docker")).toThrow(
-      "Docker is always included",
+      "Docker and Project CLI are always included",
+    );
+  });
+
+  it("rejects cli in include list", () => {
+    expect(() => parseFeatureIncludeList("auth,cli")).toThrow(
+      "Docker and Project CLI are always included",
     );
   });
 
@@ -44,13 +50,6 @@ describe("parseFeatureIncludeList", () => {
       ...MINIMAL_FEATURES,
       auth: true,
       postgres: true,
-    });
-  });
-
-  it("accepts kavoru-cli as an alias for cli", () => {
-    expect(parseFeatureIncludeList("cli")).toEqual({
-      ...MINIMAL_FEATURES,
-      cli: true,
     });
   });
 });
@@ -79,7 +78,13 @@ describe("parseFeatureExcludeList", () => {
 
   it("rejects docker in exclude list", () => {
     expect(() => parseFeatureExcludeList(["docker"], ALL_FEATURES)).toThrow(
-      "Docker is always included",
+      "Docker and Project CLI are always included",
+    );
+  });
+
+  it("rejects cli in exclude list", () => {
+    expect(() => parseFeatureExcludeList(["cli"], ALL_FEATURES)).toThrow(
+      "Docker and Project CLI are always included",
     );
   });
 });

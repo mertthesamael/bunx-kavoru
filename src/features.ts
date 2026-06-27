@@ -12,15 +12,13 @@ export type FeatureId =
   | "llama"
   | "websocket"
   | "resend"
-  | "cron"
-  | "cli";
+  | "cron";
 
 /** Always scaffolded — not a CLI toggle. */
-export const ALWAYS_INCLUDED = ["docker"] as const;
+export const ALWAYS_INCLUDED = ["docker", "cli"] as const;
 
 const FEATURE_ALIASES: Record<string, FeatureId> = {
   prisma: "postgres",
-  "kavoru-cli": "cli",
 };
 
 export type FeatureSelection = Record<FeatureId, boolean>;
@@ -82,11 +80,6 @@ export const FEATURES: FeatureDef[] = [
     label: "Cron Jobs",
     description: "Scheduled tasks via @elysiajs/cron",
   },
-  {
-    id: "cli",
-    label: "Project CLI",
-    description: "kavoru module command, bin, and module scaffolds",
-  },
 ];
 
 export const FEATURE_IDS = FEATURES.map((feature) => feature.id);
@@ -140,19 +133,6 @@ const FEATURE_PATHS: Record<FeatureId, string[]> = {
   ],
   resend: ["src/infra/resend"],
   cron: ["src/schedules"],
-  cli: [
-    "bin/kavoru.js",
-    "kavoru",
-    "kavoru.cmd",
-    "scripts/kavoru-cli.ts",
-    "scripts/generate-module.ts",
-    "scripts/generate-repository.ts",
-    "scripts/link-cli.ts",
-    "__tests__/generate-module.test.ts",
-    "__tests__/generate-repository.test.ts",
-    "__tests__/kavoru-cli.test.ts",
-    "__tests__/link-cli.test.ts",
-  ],
 };
 
 const FEATURE_DEPENDENCIES: Partial<
@@ -182,7 +162,6 @@ const FEATURE_SCRIPTS: Partial<Record<FeatureId, string[]>> = {
   otel: ["otel:view", "otel:tui"],
   sentry: ["sentry:spotlight"],
   postgres: ["seed"],
-  cli: ["link-cli"],
 };
 
 function resolveFeatureId(raw: string): FeatureId | null {
@@ -222,15 +201,20 @@ export function normalizeFeatureSelection(
   return { ...selection };
 }
 
-function rejectReservedFeatureToggle(parts: string[], action: "include" | "exclude") {
-  const reserved = parts.filter((part) =>
-    ALWAYS_INCLUDED.includes(part as (typeof ALWAYS_INCLUDED)[number]),
+function isAlwaysIncludedFeature(raw: string): boolean {
+  const normalized = raw === "kavoru-cli" ? "cli" : raw;
+  return ALWAYS_INCLUDED.includes(
+    normalized as (typeof ALWAYS_INCLUDED)[number],
   );
+}
+
+function rejectReservedFeatureToggle(parts: string[], action: "include" | "exclude") {
+  const reserved = parts.filter((part) => isAlwaysIncludedFeature(part));
   if (reserved.length === 0) return;
 
   const verb = action === "exclude" ? "disable" : "toggle";
   throw new Error(
-    `Docker is always included and cannot be ${verb}. Omit "docker" from --features / --no-features.`,
+    `Docker and Project CLI are always included and cannot be ${verb}. Omit "docker", "cli", or "kavoru-cli" from --features / --no-features.`,
   );
 }
 
@@ -547,16 +531,9 @@ async function patchPackageJson(
     pkg.scripts.start = "bun run src/index.ts";
   }
 
-  if (!selection.cli) {
-    delete pkg.bin;
-    if (pkg.scripts?.postinstall === "bun scripts/link-cli.ts") {
-      delete pkg.scripts.postinstall;
-    }
-  } else {
-    pkg.bin = { kavoru: "./bin/kavoru.js" };
-    pkg.scripts ??= {};
-    pkg.scripts.postinstall = "bun scripts/link-cli.ts";
-  }
+  pkg.bin = { kavoru: "./bin/kavoru.js" };
+  pkg.scripts ??= {};
+  pkg.scripts.postinstall = "bun scripts/link-cli.ts";
 
   await Bun.write(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
 }
@@ -690,15 +667,6 @@ async function patchDockerfile(
       /^ENTRYPOINT \["\/bin\/sh", "\/app\/docker-entrypoint\.sh"\]\n/m,
       "",
     );
-  }
-
-  if (!selection.cli) {
-    content = content.replace(/^COPY bin \.\/bin\n/m, "");
-    content = content.replace(
-      /^COPY scripts\/link-cli\.ts \.\/scripts\/link-cli\.ts\n/m,
-      "",
-    );
-    content = content.replace(/^ENV PATH="\/root\/\.bun\/bin:\$\{PATH\}"\n/m, "");
   }
 
   await writeText(projectDir, relativePath, content);

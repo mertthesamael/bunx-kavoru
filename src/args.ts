@@ -37,9 +37,9 @@ Options:
   --no-features <list>  Comma-separated features to exclude
 
 Features:
-  auth, postgres, otel, sentry, kafka, redis, llama, websocket, resend, cron, cli
-  (prisma is accepted as an alias for postgres; kavoru-cli for cli)
-  Docker Compose is always included — not a toggle.
+  auth, postgres, otel, sentry, kafka, redis, llama, websocket, resend, cron
+  (prisma is accepted as an alias for postgres)
+  Docker Compose and Project CLI are always included — not toggles.
 
 Examples:
   bunx kavoru@latest my-api
