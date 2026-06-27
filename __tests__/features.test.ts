@@ -1,4 +1,7 @@
 import { describe, expect, it } from "bun:test";
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import {
   ALL_FEATURES,
   MINIMAL_FEATURES,
@@ -8,6 +11,7 @@ import {
   normalizeFeatureSelection,
   parseFeatureExcludeList,
   parseFeatureIncludeList,
+  regenerateRouteRegistry,
 } from "../src/features";
 
 describe("parseFeatureIncludeList", () => {
@@ -177,5 +181,48 @@ describe("buildEnvExample", () => {
     expect(env).toContain(
       `DATABASE_URL=${buildDatabaseUrl("my-api", "localhost")}`,
     );
+  });
+});
+
+describe("regenerateRouteRegistry", () => {
+  it("drops imports for removed module routes", async () => {
+    const projectDir = path.join(
+      os.tmpdir(),
+      `kavoru-registry-${Date.now()}`,
+    );
+    await mkdir(path.join(projectDir, "src/modules/health"), {
+      recursive: true,
+    });
+    await mkdir(path.join(projectDir, "src/modules/kafka"), {
+      recursive: true,
+    });
+    await writeFile(
+      path.join(projectDir, "src/modules/health/routes.ts"),
+      "export default 1;\n",
+    );
+    await writeFile(
+      path.join(projectDir, "src/modules/kafka/routes.ts"),
+      "export default 1;\n",
+    );
+    await writeFile(
+      path.join(projectDir, "src/modules/routes.registry.ts"),
+      'import * as route0 from "./kafka/routes";\n',
+    );
+
+    await rm(path.join(projectDir, "src/modules/kafka"), {
+      recursive: true,
+      force: true,
+    });
+    await regenerateRouteRegistry(projectDir);
+
+    const registry = await Bun.file(
+      path.join(projectDir, "src/modules/routes.registry.ts"),
+    ).text();
+
+    expect(registry).toContain('./health/routes');
+    expect(registry).not.toContain('./kafka/routes');
+    expect(registry).toContain("routeModules = [route0]");
+
+    await rm(projectDir, { recursive: true, force: true });
   });
 });
