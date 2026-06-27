@@ -8,6 +8,7 @@ import {
   buildDatabaseUrl,
   buildEntryIndex,
   buildEnvExample,
+  buildServerIndex,
   formatFeatureSelection,
   normalizeFeatureSelection,
   parseFeatureExcludeList,
@@ -131,6 +132,29 @@ describe("buildEntryIndex", () => {
     expect(index).toContain("connectRedis");
     expect(index).toContain("stopRedis");
     expect(index).not.toContain("startKafka");
+  });
+});
+
+describe("buildServerIndex", () => {
+  it("omits schedules when cron is disabled", () => {
+    const server = buildServerIndex({
+      ...MINIMAL_FEATURES,
+      websocket: true,
+    });
+
+    expect(server).not.toContain("../schedules");
+    expect(server).not.toContain(".use(schedules)");
+    expect(server).toContain("websocket");
+  });
+
+  it("includes schedules when cron is enabled", () => {
+    const server = buildServerIndex({
+      ...MINIMAL_FEATURES,
+      cron: true,
+    });
+
+    expect(server).toContain('import { schedules } from "../schedules";');
+    expect(server).toContain(".use(schedules)");
   });
 });
 

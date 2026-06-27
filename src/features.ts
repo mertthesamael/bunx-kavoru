@@ -495,41 +495,73 @@ async function patchEntryIndex(
   await writeText(projectDir, "src/index.ts", buildEntryIndex(selection));
 }
 
+export function buildServerIndex(selection: FeatureSelection): string {
+  const imports = [
+    'import { Elysia } from "elysia";',
+    'import { config } from "../config/index";',
+    'import { logger } from "../common/logger";',
+    'import { registerModules } from "../modules";',
+    selection.cron ? 'import { schedules } from "../schedules";' : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const elysiaCtor = selection.websocket
+    ? `new Elysia({
+      websocket: {
+        idleTimeout: 120,
+      },
+    })`
+    : "new Elysia()";
+
+  const uses = [
+    "      .use(registerModules)",
+    selection.cron ? "      .use(schedules)" : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return `${imports}
+
+export class HttpServer {
+  private app: any;
+  private server?: ReturnType<Elysia["listen"]>;
+
+  constructor() {
+    this.app = ${elysiaCtor}
+${uses};
+  }
+
+  async start() {
+    if (this.server) return;
+
+    await this.app.modules;
+
+    this.server = this.app.listen(config.env.server.port, () => {
+      logger.info(
+        \`API ready on port \${config.env.server.port}. Version: \${config.version}\`,
+      );
+    });
+  }
+
+  async stop() {
+    if (!this.server) return;
+    this.server.stop();
+    this.server = undefined;
+  }
+}
+`;
+}
+
 async function patchServerIndex(
   projectDir: string,
   selection: FeatureSelection,
 ) {
-  const relativePath = "src/server/index.ts";
-  const current = await readText(projectDir, relativePath);
-  if (!current) return;
-
-  let content = current;
-
-  if (selection.cron) {
-    content = content.replace(
-      /\/\/import \{ schedules \} from "\.\.\/schedules";.*\n/,
-      'import { schedules } from "../schedules";\n',
-    );
-    content = content.replace(
-      /\/\/\.use\(schedules\);.*\n/,
-      "    .use(schedules);\n",
-    );
-  } else {
-    content = content.replace(
-      /^import \{ schedules \} from "\.\.\/schedules";\n/m,
-      "",
-    );
-    content = content.replace(/^\s*\.use\(schedules\);\n/m, "");
-  }
-
-  if (!selection.websocket) {
-    content = content.replace(
-      /new Elysia\(\{\s*websocket:\s*\{\s*idleTimeout:\s*120,\s*\},\s*\}\)/,
-      "new Elysia()",
-    );
-  }
-
-  await writeText(projectDir, relativePath, content);
+  await writeText(
+    projectDir,
+    "src/server/index.ts",
+    buildServerIndex(selection),
+  );
 }
 
 async function patchPackageJson(
